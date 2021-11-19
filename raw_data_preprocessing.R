@@ -47,8 +47,8 @@ msci_spain_top_colnames <- c(
     as.character() %>%
     str_remove("\\s\\(~E \\)") %>%
     tolower() %>%
-    str_replace(" ", "_") %>%
-    str_replace("\\.", "_")
+    str_replace_all(" ", "_") %>%
+    str_replace_all("\\.", "_")
 )
 
 colnames(msci_spain_top_const) <- msci_spain_top_colnames

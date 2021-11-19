@@ -1,0 +1,244 @@
+---
+title: "Analysis of the portfolios regarding the MSCI Spain"
+author: "Emanuel Sommer"
+output: 
+  html_document:
+    toc: true
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this analysis different portfolios consisting of stocks that are among the top 10 constituents of the MSCI Spain Index are backtested using the functionality of the `portvine` package. First the most important packages are loaded and after that the data will be imported and discussed shortly.
+
+```{r, message=FALSE, warning=FALSE}
+library(portvine)
+library(tidyverse)
+# utility color vector for visualizations
+yes_no_cols <- c("#92B8DE", "#db4f59")
+theme_set(
+  theme_minimal() +
+  theme(plot.title = ggtext::element_markdown(size = 11),
+        plot.subtitle = ggtext::element_markdown(size = 9))
+)
+# load the data
+load(here::here("data", "msci_spain_data_clean.RData"))
+```
+
+## A first glimpse at the data
+
+```{r}
+glimpse(msci_spain_data)
+```
+
+One can see that there are 11 columns. The `date` column gives obviously the date as daily return data will be analyzed here. The daily log returns of the overall index are given in the column `msci_spain_index` and all other columns contain the daily log returns of the respective stock. One can also detect missing values which can be nicely observed in the visualization below.
+
+```{r, echo=FALSE}
+msci_spain_data %>%
+  rowid_to_column("id") %>%
+  pivot_longer(-c(date, id)) %>%
+  mutate(missing = is.na(value)) %>%
+  ggplot() +
+  geom_point(aes(x = date, y = factor(name), col = missing),
+             shape = 15, size = 10) +
+  scale_color_manual(values = yes_no_cols) +
+  scale_y_discrete(labels = ~ str_to_title(str_replace_all(.x, "_", " "))) +
+  guides(col = "none") +
+  labs(x = "", y = "",
+       title = paste("Display asset returns that are ",
+                     "<span style='color:",
+                     yes_no_cols[1],
+                     "'>**available**</span>",
+                     " or ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**missing**</span>",
+                     "."))
+  
+```
+
+This makes total sense as for example Cellnex Telecom stocks are traded since 2015, so there can not be earlier return data. So one could now either impute the values in order to use the whole time frame but here the more simplistic approach of just looking at a time frame without any missing values is applied.
+This reduced data set is available as `msci_spain_complete_data` and contains only complete cases. 
+
+```{r}
+summary(msci_spain_complete_data$date)
+nrow(msci_spain_complete_data)
+```
+
+This means that the time frame is from the 8th Mai of 2015 until the 8th November of 2021 and there are `r nrow(msci_spain_complete_data)` observations. Below one can have a look at daily log returns of the overall MSCI Spain index.
+
+```{r, echo=FALSE}
+ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
+  geom_line() +
+  labs(x = "", y = "Daily log return",
+       title = "MSCI Spain index") 
+```
+
+So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulences, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. This should give the opportunity to access how robust the risk measure estimates are during a crisis. Now specify the first portfolio and analyze it unconditionally as well as conditionally.
+
+
+## The missing leader portfolio `missl`
+
+Here one picks as the stock portfolio equally weighted all the stocks without the one with the highest market capitalization that makes roughly 17% of the MSCI Spain i.e. Iberdrola, that is mainly in the energy business. First one models this portfolio and estimates the risk estimates unconditionally and then conditionally on the biggest player Iberdrola. But first specify suitable marginal model settings as well as settings for the vine copula.
+
+```{r}
+missl_marginal_settings <- marginal_settings(
+  train_size = 1000,
+  refit_size = 50
+)
+
+missl_vine_settings <- vine_settings(
+  train_size = 200,
+  refit_size = 25,
+  family_set = "all",
+  vine_type = "rvine"
+)
+```
+
+To compare run times one estimates the risk once sequentially and once in parallel.
+
+```{r}
+# sequentially
+missl_risk_roll_seq <- estimate_risk_roll(
+  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
+  weights = NULL,
+  marginal_settings = missl_marginal_settings,
+  vine_settings = missl_vine_settings,
+  alpha = c(0.01, 0.05, 0.1),
+  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
+  n_samples = 1000,
+  n_mc_samples = 1000,
+  trace = TRUE
+)
+
+# 4 parallel R session
+future::plan("multisession", workers = 4)
+missl_risk_roll <- estimate_risk_roll(
+  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
+  weights = NULL,
+  marginal_settings = missl_marginal_settings,
+  vine_settings = missl_vine_settings,
+  alpha = c(0.01, 0.05, 0.1),
+  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
+  n_samples = 1000,
+  n_mc_samples = 1000,
+  trace = TRUE
+)
+future::plan("sequential")
+```
+
+The results and their respective run times can be seen below.
+
+```{r}
+missl_risk_roll_seq
+missl_risk_roll
+# thus the speedup is already for 4 workers
+missl_risk_roll_seq@time_taken / missl_risk_roll@time_taken
+# besides the print method one can also call the summary for more details
+summary(missl_risk_roll)
+```
+
+Now one can use the accessor functions to extract the fitted marginal as well as the vine copula models.
+
+```{r}
+### get the fitted marginal models
+missl_fitted_marginals <- fitted_marginals(missl_risk_roll)
+# for each asset one now can access the uGARCHroll object that for example 
+# contains the fitted coefficients for the second rolling window 
+missl_fitted_marginals$banco_santander@model$coef[[2]]$coef
+
+### get the fitted vine copula models
+missl_fitted_vines <- fitted_vines(missl_risk_roll)
+# then one can for example have a look at how the fitted vine structure evolved
+#  over time by plotting the first tree for different rolloing windows
+rvinecopulib:::plot.vinecop(missl_fitted_vines[[1]])
+rvinecopulib:::plot.vinecop(missl_fitted_vines[[28]])
+```
+
+Now finally the risk estimates are going to be analyzed. First one compares the 3 different methods of estimating the Expected Shortfall.
+
+```{r, echo=FALSE}
+risk_estimates(missl_risk_roll,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05) %>%
+  dtplyr::lazy_dt() %>%
+  pivot_wider(names_from = risk_measure, values_from = risk_est) %>%
+  as.data.frame() %>%
+  plotly::plot_ly(x = ~ES_mean, y = ~ES_median, z = ~ES_mc,
+                  marker = list(symbol = 'circle', color = "black",
+                                size = 2),
+                  text = ~ paste('Row:', row_num)) %>%
+  plotly::add_markers(opacity = 0.2) %>%
+  plotly::layout(
+    scene = list(xaxis = list(title = 'Mean'),
+                 yaxis = list(title = 'Median'),
+                 zaxis = list(title = 'Monte Carlo')),
+    title = "Empirical comparison of Expected Shortfall estimatiors"
+  )
+```
+
+Also one might compare the number of exceedances.
+
+```{r}
+risk_estimates(missl_risk_roll,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05) %>%
+  dtplyr::lazy_dt() %>%
+  mutate(exceedances = realized < risk_est) %>%
+  group_by(risk_measure) %>%
+  summarise(relative_exceedances = mean(exceedances)) %>%
+  as.data.frame()
+```
+
+Here actually we find an indication for the fact that the values that fell below the corresponding VaR where left skewed which leads to the fact that the mean will be a more conservative estimate in those cases which might explain the slightly lower exceedance rate.
+
+### Exceedance plots
+
+```{r, echo=TRUE}
+risk_estimates(missl_risk_roll,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est,
+                col = risk_measure, linetype = risk_measure),
+            size = 0.5) +
+  labs(x = "estimation window", y = "portfolio log returns",
+       linetype = "Risk measure",
+       title = "Comparison of risk measure behaivior for alpha level 0.01") +
+  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+                     name = "Risk measure") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+```{r}
+risk_estimates(missl_risk_roll,
+               risk_measures = c("VaR"),
+               alpha = 0.01) %>%
+  dtplyr::lazy_dt() %>%
+  mutate(exceeded = if_else(risk_est > realized, "Yes", "No")) %>%
+  data.table::as.data.table() %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_point(aes(x = row_num, y = realized, col = exceeded)) +
+  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
+  scale_color_manual(values = c("lightgrey", yes_no_cols[2])) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       title = "Risk measure: VaR  with alpha level 0.01"
+       ) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+
+
+
+
+
+
