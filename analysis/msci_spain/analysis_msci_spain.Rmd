@@ -82,7 +82,11 @@ So one can observe greater volatility during the stock market selloffs 2015-2016
 
 ## The missing leader portfolio `missl`
 
-Here one picks as the stock portfolio equally weighted all the stocks without the one with the highest market capitalization that makes roughly 17% of the MSCI Spain i.e. Iberdrola, that is mainly in the energy business. First one models this portfolio and estimates the risk estimates unconditionally and then conditionally on the biggest player Iberdrola. But first specify suitable marginal model settings as well as settings for the vine copula.
+Here one picks as the stock portfolio equally weighted all the stocks without the one with the highest market capitalization that makes roughly 17% of the MSCI Spain i.e. Iberdrola, that is mainly in the energy business. First one models this portfolio and estimates the risk estimates unconditionally and then conditionally on the biggest player Iberdrola. 
+
+### Unconditional `missl` portfolio
+
+First specify suitable marginal model settings as well as settings for the vine copula.
 
 ```{r}
 missl_marginal_settings <- marginal_settings(
@@ -141,6 +145,8 @@ missl_risk_roll_seq@time_taken / missl_risk_roll@time_taken
 summary(missl_risk_roll)
 ```
 
+#### Inspect marginal and vine copula model fits
+
 Now one can use the accessor functions to extract the fitted marginal as well as the vine copula models.
 
 ```{r}
@@ -158,15 +164,15 @@ rvinecopulib:::plot.vinecop(missl_fitted_vines[[1]])
 rvinecopulib:::plot.vinecop(missl_fitted_vines[[28]])
 ```
 
+#### Analyze estimated risk measures
+
 Now finally the risk estimates are going to be analyzed. First one compares the 3 different methods of estimating the Expected Shortfall.
 
 ```{r, echo=FALSE}
 risk_estimates(missl_risk_roll,
                risk_measures = c("ES_mean", "ES_median", "ES_mc"),
                alpha = 0.05) %>%
-  dtplyr::lazy_dt() %>%
   pivot_wider(names_from = risk_measure, values_from = risk_est) %>%
-  as.data.frame() %>%
   plotly::plot_ly(x = ~ES_mean, y = ~ES_median, z = ~ES_mc,
                   marker = list(symbol = 'circle', color = "black",
                                 size = 2),
@@ -185,12 +191,10 @@ Also one might compare the number of exceedances.
 ```{r}
 risk_estimates(missl_risk_roll,
                risk_measures = c("ES_mean", "ES_median", "ES_mc"),
-               alpha = 0.05) %>%
-  dtplyr::lazy_dt() %>%
-  mutate(exceedances = realized < risk_est) %>%
+               alpha = 0.05,
+               exceeded = TRUE) %>%
   group_by(risk_measure) %>%
-  summarise(relative_exceedances = mean(exceedances)) %>%
-  as.data.frame()
+  summarise(relative_exceedances = mean(exceeded))
 ```
 
 Here actually we find an indication for the fact that the values that fell below the corresponding VaR where left skewed which leads to the fact that the mean will be a more conservative estimate in those cases which might explain the slightly lower exceedance rate.
@@ -218,10 +222,8 @@ risk_estimates(missl_risk_roll,
 ```{r}
 risk_estimates(missl_risk_roll,
                risk_measures = c("VaR"),
-               alpha = 0.01) %>%
-  dtplyr::lazy_dt() %>%
-  mutate(exceeded = if_else(risk_est > realized, "Yes", "No")) %>%
-  data.table::as.data.table() %>%
+               alpha = 0.01,
+               exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
   geom_point(aes(x = row_num, y = realized, col = exceeded)) +
@@ -230,13 +232,79 @@ risk_estimates(missl_risk_roll,
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
-       title = "Risk measure: VaR  with alpha level 0.01"
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: VaR with alpha level 0.01"
        ) +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
+
+risk_estimates(missl_risk_roll,
+               risk_measures = c("ES_mean"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_point(aes(x = row_num, y = realized, col = exceeded)) +
+  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
+  scale_color_manual(values = c("lightgrey", yes_no_cols[2])) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES (mean estimation) with alpha level 0.01"
+       ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
 ```
 
+### Conditional `missl` portfolio
 
+Estimation is performed in the same fashion as above with some additional arguments concerning the conditioning on the stock Iberdrola.
+
+```{r}
+missl_cond_marginal_settings <- marginal_settings(
+  train_size = 1000,
+  refit_size = 50
+)
+
+missl_cond_vine_settings <- vine_settings(
+  train_size = 200,
+  refit_size = 25,
+  family_set = "parametric",
+  vine_type = "dvine"
+)
+future::plan("multisession", workers = 6)
+missl_cond_risk_roll <- estimate_risk_roll(
+  msci_spain_complete_data %>% select(-c(date, msci_spain_index)),
+  weights = NULL,
+  marginal_settings = missl_cond_marginal_settings,
+  vine_settings = missl_cond_vine_settings,
+  alpha = c(0.01, 0.05, 0.1),
+  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
+  n_samples = 1000,
+  n_mc_samples = 1000,
+  cond_vars = "iberdrola",
+  cond_alpha = c(0.05, 0.5),
+  trace = TRUE
+)
+future::plan("sequential")
+```
+
+```{r}
+summary(missl_cond_risk_roll)
+```
 
 
 
