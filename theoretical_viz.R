@@ -34,6 +34,25 @@ ggplot() +
         legend.background = element_blank(),
         legend.text = element_text(size = 12))
 
+### Stationary time series -------------------------------------------
+
+tibble(x = 1:200,
+       y = as.numeric(arima.sim(list(ma = 3), n = 200))) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_line(size = 0.3) +
+  geom_smooth(se = FALSE, col = my_blue, size = 1,
+              method = "loess", formula = "y ~ x", span = 1000) +
+  labs(x = "t", y = expression(x[t]),
+       title = "Exemplary weakly stationary time series with loess smoothing line") +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12))
+
 ### Value at Risk ----------------------------------------------------
 ggplot() +
   stat_function(fun = pnorm, size = 1, n = 100001) +
