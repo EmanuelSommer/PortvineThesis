@@ -39,8 +39,8 @@ ggplot() +
 tibble(x = 1:200,
        y = as.numeric(arima.sim(list(ma = 3), n = 200))) %>%
   ggplot(aes(x = x, y = y)) +
-  geom_line(size = 0.3) +
-  geom_smooth(se = FALSE, col = my_blue, size = 1,
+  geom_line(size = 0.3, alpha = 0.6) +
+  geom_smooth(se = FALSE, col = my_blue, size = 1.3,
               method = "loess", formula = "y ~ x", span = 1000) +
   labs(x = "t", y = expression(x[t]),
        title = "Exemplary weakly stationary time series with loess smoothing line") +
