@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(latex2exp)
+library(patchwork)
 # colors
 my_blue <- "#92B8DE"
 my_red <- "#db4f59"
@@ -52,6 +53,111 @@ tibble(x = 1:200,
         panel.grid.major = element_line(colour = "grey", size = .2),
         axis.text = element_text(size = 10),
         axis.title = element_text(size = 12))
+
+### AR(1) sample paths -----------------------------------------------
+
+ar1_sample_paths <- tibble(x = 1:100,
+       "0.1" = as.numeric(arima.sim(list(order = c(1, 0, 0), ar = 0.1),
+                                n = 100)),
+       "0.9" = as.numeric(arima.sim(list(order = c(1, 0, 0), ar = 0.9),
+                                n = 100)),
+       "-0.9" = as.numeric(arima.sim(list(order = c(1, 0, 0), ar = -0.9),
+                                n = 100))
+       ) %>%
+  pivot_longer(-x, names_to = "phi", values_to = "y") %>%
+  mutate(phi = as.factor(phi),
+         phi = fct_inorder(phi))
+levels(ar1_sample_paths$phi) <- c(
+  TeX("$\\phi = 0.1$"),
+  TeX("$\\phi = 0.9$"),
+  TeX("$\\phi = -0.9$")
+)
+
+a1_sample_paths_plot <- ar1_sample_paths %>%
+  ggplot() +
+  geom_line(aes(x = x, y = y)) +
+  facet_wrap(~phi,
+             labeller = label_parsed) +
+  labs(x = "t", y = expression(x[t]),
+       title = TeX("Exemplary AR(1) sample paths and emp. autocovariance function $\\hat{\\gamma}$")) +
+  scale_x_continuous(breaks = seq(0, 100, 50)) +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+a1_sample_acf_plot <- ar1_sample_paths %>%
+  group_by(phi) %>%
+  summarize(acf = as.numeric(acf(y, type = "cov", plot = FALSE)$acf),
+            lag = 0:20) %>%
+  ungroup() %>%
+  filter(lag != 0 & lag <= 10) %>%
+  ggplot() +
+  geom_segment(aes(x = lag, xend = lag, y = 0, yend = acf)) +
+  geom_point(aes(x = lag, y = acf)) +
+  scale_x_continuous(breaks = seq(1, 10, 1)) +
+  facet_wrap(~phi,
+             labeller = label_parsed) +
+  labs(x = "h", y = TeX("$\\hat{\\gamma}(h)$")) +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+a1_sample_paths_plot / a1_sample_acf_plot
+
+### MA(1) sample paths -----------------------------------------------
+
+ma1_sample_paths <- tibble(x = 1:100,
+                           "0.1" = as.numeric(arima.sim(list(order = c(0, 0, 1), ma = 0.1),
+                                                        n = 100)),
+                           "0.9" = as.numeric(arima.sim(list(order = c(0, 0, 1), ma = 0.9),
+                                                        n = 100)),
+                           "-0.9" = as.numeric(arima.sim(list(order = c(0, 0, 1), ma = -0.9),
+                                                         n = 100))
+) %>%
+  pivot_longer(-x, names_to = "theta", values_to = "y") %>%
+  mutate(theta = as.factor(theta),
+         theta = fct_inorder(theta))
+levels(ma1_sample_paths$theta) <- c(
+  TeX("$\\theta = 0.1$"),
+  TeX("$\\theta = 0.9$"),
+  TeX("$\\theta = -0.9$")
+)
+
+ma1_sample_paths %>%
+  ggplot() +
+  geom_line(aes(x = x, y = y)) +
+  facet_wrap(~theta,
+             labeller = label_parsed) +
+  labs(x = "t", y = expression(x[t]),
+       title = TeX("Exemplary MA(1) sample paths")) +
+  scale_x_continuous(breaks = seq(0, 100, 50)) +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+
+
 
 ### Value at Risk ----------------------------------------------------
 ggplot() +
