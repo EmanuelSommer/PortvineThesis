@@ -157,7 +157,13 @@ ma1_sample_paths %>%
         strip.text = element_text(size = 10, color = "black"))
 
 
+### Assess model quality ts models -----------------------------------
 
+# standardized residuals
+# ACF
+# heterogenity
+# ljung box
+# qq plot heavy and normal tails
 
 ### Value at Risk ----------------------------------------------------
 ggplot() +
