@@ -99,6 +99,7 @@ a1_sample_acf_plot <- ar1_sample_paths %>%
   ungroup() %>%
   filter(lag != 0 & lag <= 10) %>%
   ggplot() +
+  geom_hline(yintercept = 0, col = "black", size = 0.3) +
   geom_segment(aes(x = lag, xend = lag, y = 0, yend = acf)) +
   geom_point(aes(x = lag, y = acf)) +
   scale_x_continuous(breaks = seq(1, 10, 1)) +
@@ -159,11 +160,123 @@ ma1_sample_paths %>%
 
 ### Assess model quality ts models -----------------------------------
 
-# standardized residuals
-# ACF
-# heterogenity
-# ljung box
-# qq plot heavy and normal tails
+set.seed(222)
+sample_tbl <- tibble(
+  id = 1:100,
+  normal = rnorm(100),
+  t = rt(100, df = 2),
+  correlated = as.numeric(
+    arima.sim(list(ar = c(0.1, 0.3, 0.3, 0.2)), 100)
+  ),
+  heterogenity = rnorm(100, sd = c(rep(0.5, 50), seq(1, 2, length.out = 50)))
+) %>%
+  mutate(correlated = (correlated - mean(correlated)) / sd(correlated),
+         t = (t - mean(t)) / sd(t)) %>%
+  pivot_longer(-id, names_to = "sample", values_to = "value")
+
+sample_tbl <- sample_tbl %>%
+  mutate(sample = case_when(
+    sample == "normal" ~ "i.i.d. normal",
+    sample == "t" ~ "i.i.d. Student's t",
+    sample == "heterogenity" ~ "variance heterogenity",
+    TRUE ~ "correlated"
+  )) %>%
+  mutate(sample = as.ordered(sample),
+         sample = fct_inorder(sample))
+
+# simple exploratory
+sample_tbl %>%
+  ggplot(aes(x = id, y = value)) +
+  geom_line() +
+  labs(x = "t", y = expression(z[t]),
+       title = "") +
+  facet_wrap(~sample) +
+  scale_x_continuous(breaks = seq(0, 100, 50)) +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+# ACFs
+sample_tbl %>%
+  group_by(sample) %>%
+  summarize(acf = as.numeric(acf(value, type = "cor", plot = FALSE)$acf),
+            lag = 0:20) %>%
+  ungroup() %>%
+  filter(lag != 0 & lag <= 10) %>%
+  ggplot() +
+  geom_hline(yintercept = 0, col = "black", size = 0.3) +
+  geom_hline(yintercept = qnorm(c(0.025, 0.975)) / sqrt(nrow(sample_tbl)),
+             linetype = "longdash", col = my_blue, size = 0.8) +
+  geom_segment(aes(x = lag, xend = lag, y = 0, yend = acf)) +
+  geom_point(aes(x = lag, y = acf)) +
+  scale_x_continuous(breaks = seq(1, 10, 1)) +
+  facet_wrap(~sample) +
+  labs(x = "h", y = "ACF(h)") +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+# normal QQ plots
+sample_tbl %>%
+  ggplot(aes(sample = value)) +
+  geom_abline(col = my_blue, size = 0.8) +
+  geom_qq(alpha = 0.5) +
+  coord_fixed() +
+  scale_x_continuous(breaks = seq(-4, 4, 2)) +
+  scale_y_continuous(breaks = seq(-4, 4, 2)) +
+  facet_wrap(~sample, ncol = 4) +
+  labs(x = "theoretical i.e. N(0,1)") +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
+
+# Ljung Box tests
+sample_tbl %>%
+  group_by(sample) %>%
+  summarize(pval = sapply(1:10,
+                    function(i) Box.test(value, lag = i, type = "Lju")$p.value),
+            lag = 1:10) %>%
+  ungroup() %>%
+  ggplot() +
+  geom_hline(yintercept = 0, col = "black", size = 0.3) +
+  geom_hline(yintercept = 0.05,
+             linetype = "longdash", col = my_blue, size = 0.8) +
+  geom_line(aes(x = lag, y = pval)) +
+  geom_point(aes(x = lag, y = pval)) +
+  scale_x_continuous(breaks = seq(1, 10, 1)) +
+  facet_wrap(~sample) +
+  labs(x = "h", y = "p-value of Ljung-Box test at lag h") +
+  theme_light() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid.major = element_line(colour = "grey", size = .2),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        strip.background = element_rect(color = "grey"),
+        strip.text = element_text(size = 10, color = "black"))
 
 ### Value at Risk ----------------------------------------------------
 ggplot() +
