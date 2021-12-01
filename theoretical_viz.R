@@ -178,7 +178,7 @@ sample_tbl <- sample_tbl %>%
   mutate(sample = case_when(
     sample == "normal" ~ "i.i.d. normal",
     sample == "t" ~ "i.i.d. Student's t",
-    sample == "heterogenity" ~ "variance heterogenity",
+    sample == "heterogenity" ~ "variance heterogeneity",
     TRUE ~ "correlated"
   )) %>%
   mutate(sample = as.ordered(sample),
