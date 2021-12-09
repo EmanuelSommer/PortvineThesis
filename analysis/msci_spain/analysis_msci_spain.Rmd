@@ -226,9 +226,9 @@ risk_estimates(missl_risk_roll,
                exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_point(aes(x = row_num, y = realized, col = exceeded)) +
   geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  scale_color_manual(values = c("lightgrey", yes_no_cols[2])) +
+  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
@@ -250,9 +250,9 @@ risk_estimates(missl_risk_roll,
                exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_point(aes(x = row_num, y = realized, col = exceeded)) +
   geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  scale_color_manual(values = c("lightgrey", yes_no_cols[2])) +
+  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
@@ -285,6 +285,7 @@ missl_cond_vine_settings <- vine_settings(
   family_set = "parametric",
   vine_type = "dvine"
 )
+
 future::plan("multisession", workers = 6)
 missl_cond_risk_roll <- estimate_risk_roll(
   msci_spain_complete_data %>% select(-c(date, msci_spain_index)),
@@ -306,7 +307,121 @@ future::plan("sequential")
 summary(missl_cond_risk_roll)
 ```
 
+```{r}
+# what about the evolution of the conditional values (iberdrola)
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(
+    data = msci_spain_complete_data[1001:nrow(msci_spain_complete_data), ],
+    aes(x = 1001:nrow(msci_spain_complete_data),
+        y = iberdrola), col = "lightgrey", size = .3) +
+  geom_line(aes(x = row_num, y = iberdrola, col = factor(cond_alpha)),
+            size = 0.5) +
+  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+                     name = "Conditional alpha level") +
+  labs(title = "Conditional variable: Iberdrola",
+       x = "estimation window", y = "log returns") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
+
+Nice to see so we expect the corresponding conditional risk measures with low conditional $\alpha$ level to be way more conservative under the assumption that Iberdrola has a generally positive dependence with the portfolio of interest. Therefore look at the next plot.
+
+```{r}
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est,
+                col = factor(cond_alpha), linetype = factor(cond_alpha)),
+            size = 0.5) +
+  labs(x = "estimation window", y = "portfolio log returns",
+       linetype = "Conditional alpha level",
+       title = "Comparison of risk measure behaivior for 2 conditional alpha levels") +
+  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+                     name = "Conditional alpha level") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+```
 
 
+A close look wrt exceedences.
 
+```{r}
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_alpha = 0.5,
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
+  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES (mean estimation) with alpha level 0.05, conditional alpha level 0.5"
+       ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
 
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_alpha = 0.05,
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
+  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES (mean estimation) with alpha and conditional alpha level 0.05"
+       ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
+```
+
+While the 0.5 conditional value leads to lots of exceedances (not surprisingly) the conditional value of 0.05 shows not many exceedances. For a rough comparison one can have a short comparison with the above fitted unconditional ES with mean estimation for the same confidence level.
+
+```{r}
+risk_estimates(missl_risk_roll,
+               risk_measures = c("ES_mean"),
+               alpha = 0.05,
+               exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
+  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     yes_no_cols[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES (mean estimation) with alpha level 0.05"
+       ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
+```
+
+So in the direct comparison the conditional risk measure is way more conservative and might help in stresstesting situations for projected hard times of specific conditional assets.
