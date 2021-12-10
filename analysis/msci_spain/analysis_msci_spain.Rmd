@@ -17,6 +17,7 @@ In this analysis different portfolios consisting of stocks that are among the to
 ```{r, message=FALSE, warning=FALSE}
 library(portvine)
 library(tidyverse)
+library(patchwork)
 # utility color vector for visualizations
 yes_no_cols <- c("#92B8DE", "#db4f59")
 theme_set(
@@ -77,7 +78,14 @@ ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
        title = "MSCI Spain index") 
 ```
 
-So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulences, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. This should give the opportunity to access how robust the risk measure estimates are during a crisis. Now specify the first portfolio and analyze it unconditionally as well as conditionally.
+So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulences, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. This should give the opportunity to access how robust the risk measure estimates are during a crisis. With a training data window size of 1000 one would start estimating risk measures from March 2019 so the high volatility corona situation will be covered.
+
+```{r}
+# first risk estimate date for 1000 as the training window size
+msci_spain_complete_data$date[1001]
+```
+
+Now specify the first portfolio and analyze it unconditionally as well as conditionally.
 
 
 ## The missing leader portfolio `missl`
@@ -147,22 +155,125 @@ summary(missl_risk_roll)
 
 #### Inspect marginal and vine copula model fits
 
-Now one can use the accessor functions to extract the fitted marginal as well as the vine copula models.
+Now one can use the accessor functions to extract the fitted marginal as well as the vine copula models. But first one has a close look at the marginal models and can assess their model quality.
 
-```{r}
+```{r, echo=TRUE, results='hide'}
 ### get the fitted marginal models
 missl_fitted_marginals <- fitted_marginals(missl_risk_roll)
 # for each asset one now can access the uGARCHroll object that for example 
 # contains the fitted coefficients for the second rolling window 
-missl_fitted_marginals$banco_santander@model$coef[[2]]$coef
 
+# extract the residuals of the models (helper function maybe include in the
+# package)
+fitted_stand_resid <- function(ugarchroll, roll_num) {
+  total_roll_num <- ugarchroll@model$n.refits
+  train_end_index <- ugarchroll@model$n.start
+  refit_size <- ugarchroll@model$refit.every
+  distribution <- ugarchroll@model$spec@model$modeldesc$distribution
+  coefs <- ugarchroll@model$coef[[roll_num]]$coef[, 1]
+  spec <- rugarch::ugarchspec(
+    distribution.model = distribution, 
+    fixed.pars = coefs
+  )
+  filtered_model <- rugarch::ugarchfilter(
+    spec = spec, 
+    data = ugarchroll@model$data[seq(1 + refit_size * (roll_num - 1),
+                                     min(1 + refit_size * (roll_num - 1) +
+                                       train_end_index,
+                                       length(ugarchroll@model$data)))]
+  )
+  as.numeric(rugarch::residuals(filtered_model, standardize = TRUE))
+}
+
+# For now analyze the residuals of every first of each asset.
+missl_resid_plots <- sapply(
+  setdiff(names(msci_spain_complete_data),
+          c("msci_spain_index", "iberdrola", "date")),
+  function(asset_name) {
+    first_model_resid <- fitted_stand_resid(
+      missl_fitted_marginals[[asset_name]], 1
+    )
+    
+    simple_exploratory <- tibble(resid = first_model_resid) %>%
+      tibble::rowid_to_column(var = "id") %>%
+      ggplot(aes(x = id, y = resid)) +
+      geom_line(size = 0.2) +
+      labs(x = "t", y = expression(z[t]),
+           title = str_to_title(str_replace_all(asset_name, "_", " "))) +
+      theme(axis.text.x = element_blank(),
+            axis.ticks.x = element_blank())
+    
+    acf_plot <- tibble(
+      acf = as.numeric(acf(first_model_resid, type = "cor", lag.max = 20,
+                           plot = FALSE)$acf),
+      lag = 0:20
+    ) %>%
+      filter(lag != 0 & lag <= 10) %>%
+      ggplot() +
+      geom_hline(yintercept = 0, col = "black", size = 0.3) +
+      geom_hline(yintercept = qnorm(c(0.025, 0.975)) /
+                   sqrt(length(first_model_resid)),
+                 linetype = "longdash", col = yes_no_cols[1], size = 0.5) +
+      geom_segment(aes(x = lag, xend = lag, y = 0, yend = acf)) +
+      geom_point(aes(x = lag, y = acf)) +
+      scale_x_continuous(breaks = seq(1, 10, 1)) +
+      ylim(-1, 1) +
+      labs(x = "h", y = "ACF(h)")
+    
+    ljungplot <- tibble(
+      pval = sapply(
+        1:10,
+        function(i) Box.test(first_model_resid, lag = i,
+                             type = "Lju")$p.value),
+      lag = 1:10) %>%
+      ggplot() +
+      geom_hline(yintercept = 0, col = "black", size = 0.3) +
+      geom_hline(yintercept = 0.05,
+                 linetype = "longdash", col = yes_no_cols[1], size = 0.5) +
+      geom_line(aes(x = lag, y = pval)) +
+      geom_point(aes(x = lag, y = pval)) +
+      scale_x_continuous(breaks = seq(1, 10, 1)) +
+      labs(x = "h", y = "p-value of Ljung-Box test at lag h")
+    
+    (simple_exploratory / (ljungplot + acf_plot)) +
+      plot_layout(nrow = 2)
+  }, USE.NAMES = TRUE, simplify = FALSE)
+```
+
+```{r}
+# exemplary 2 plots, all plots showed basically the same behavior like the ones
+# below
+missl_resid_plots$telefonica
+missl_resid_plots$repsol_ypf
+```
+
+
+So overall the marginal models seem to satisfy the model assumptions. Notably there were many cases with a heavier lower tail which can be explained by the high volatility corona crisis. As already the skewed student's t distribution was chosen for the residual distribution one already accounts for heavy tails.
+
+Now one can have a look at the fitted vine copulas. Again there is an appropriate accessor function that helps with extracting them. After that one can visually inspect how the first tree of the vines has changed over time.
+
+```{r}
 ### get the fitted vine copula models
 missl_fitted_vines <- fitted_vines(missl_risk_roll)
 # then one can for example have a look at how the fitted vine structure evolved
-#  over time by plotting the first tree for different rolloing windows
+#  over time by plotting the first tree for different rolling windows
 rvinecopulib:::plot.vinecop(missl_fitted_vines[[1]])
+rvinecopulib:::plot.vinecop(missl_fitted_vines[[14]])
 rvinecopulib:::plot.vinecop(missl_fitted_vines[[28]])
 ```
+
+A quick mapping table for the number might help for the interpretation
+
+```{r, echo=FALSE}
+tibble(
+  number = 1:8,
+  asset = setdiff(names(msci_spain_complete_data),
+          c("msci_spain_index", "iberdrola", "date"))
+)
+```
+
+The first two assets seem to be very important in their dependence structure.
+
 
 #### Analyze estimated risk measures
 
@@ -269,6 +380,31 @@ risk_estimates(missl_risk_roll,
     legend.position = "none")
 ```
 
+Also fit the unconditional `missl` portfolio with only D vine copulas allowed to compare these D vines with the then conditional ones.
+
+```{r}
+missl_vine_settings_d <- vine_settings(
+  train_size = 200,
+  refit_size = 25,
+  family_set = "all",
+  vine_type = "dvine"
+)
+future::plan("multisession", workers = 6)
+missl_risk_roll_d <- estimate_risk_roll(
+  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
+  weights = NULL,
+  marginal_settings = missl_marginal_settings,
+  vine_settings = missl_vine_settings_d,
+  alpha = c(0.01, 0.05, 0.1),
+  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
+  n_samples = 1000,
+  n_mc_samples = 1000,
+  trace = TRUE
+)
+future::plan("sequential")
+```
+
+
 ### Conditional `missl` portfolio
 
 Estimation is performed in the same fashion as above with some additional arguments concerning the conditioning on the stock Iberdrola.
@@ -305,6 +441,29 @@ future::plan("sequential")
 
 ```{r}
 summary(missl_cond_risk_roll)
+```
+
+Compare the fitted conditional vines with the ones of the unconditional dvine fitting.
+
+```{r}
+# unconditional first
+rvinecopulib:::plot.vinecop(fitted_vines(missl_risk_roll_d)[[1]])
+# conditional first
+rvinecopulib:::plot.vinecop(fitted_vines(missl_cond_risk_roll)[[1]])
+# unconditional last
+rvinecopulib:::plot.vinecop(fitted_vines(missl_risk_roll_d)[[28]])
+# conditional last
+rvinecopulib:::plot.vinecop(fitted_vines(missl_cond_risk_roll)[[28]])
+```
+
+Notably for the conditional case the following mapping applies:
+
+```{r, echo=FALSE}
+tibble(
+  number = 1:9,
+  asset = setdiff(names(msci_spain_complete_data),
+          c("msci_spain_index", "date"))
+)
 ```
 
 ```{r}
@@ -425,3 +584,60 @@ risk_estimates(missl_risk_roll,
 ```
 
 So in the direct comparison the conditional risk measure is way more conservative and might help in stresstesting situations for projected hard times of specific conditional assets.
+
+
+## Double conditional short trial
+
+Here just the estimation with two conditional values is tested shortly.
+
+```{r}
+cond2test_marginal_settings <- marginal_settings(
+  train_size = 1000,
+  refit_size = 50
+)
+
+cond2test_vine_settings <- vine_settings(
+  train_size = 200,
+  refit_size = 25,
+  family_set = "parametric",
+  vine_type = "dvine"
+)
+
+future::plan("multisession", workers = 6)
+cond2test_risk_roll <- estimate_risk_roll(
+  msci_spain_complete_data %>% select(-c(date, msci_spain_index)),
+  weights = NULL,
+  marginal_settings = cond2test_marginal_settings,
+  vine_settings = cond2test_vine_settings,
+  alpha = c(0.01, 0.05, 0.1),
+  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
+  n_samples = 1000,
+  n_mc_samples = 1000,
+  cond_vars = c("iberdrola", "banco_santander"),
+  cond_alpha = c(0.05, 0.5),
+  trace = TRUE
+)
+future::plan("sequential")
+```
+
+```{r}
+summary(cond2test_risk_roll)
+risk_estimates(cond2test_risk_roll)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
