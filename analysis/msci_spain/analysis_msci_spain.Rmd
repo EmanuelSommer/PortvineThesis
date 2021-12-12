@@ -163,34 +163,13 @@ missl_fitted_marginals <- fitted_marginals(missl_risk_roll)
 # for each asset one now can access the uGARCHroll object that for example 
 # contains the fitted coefficients for the second rolling window 
 
-# extract the residuals of the models (helper function maybe include in the
-# package)
-fitted_stand_resid <- function(ugarchroll, roll_num) {
-  total_roll_num <- ugarchroll@model$n.refits
-  train_end_index <- ugarchroll@model$n.start
-  refit_size <- ugarchroll@model$refit.every
-  distribution <- ugarchroll@model$spec@model$modeldesc$distribution
-  coefs <- ugarchroll@model$coef[[roll_num]]$coef[, 1]
-  spec <- rugarch::ugarchspec(
-    distribution.model = distribution, 
-    fixed.pars = coefs
-  )
-  filtered_model <- rugarch::ugarchfilter(
-    spec = spec, 
-    data = ugarchroll@model$data[seq(1 + refit_size * (roll_num - 1),
-                                     min(1 + refit_size * (roll_num - 1) +
-                                       train_end_index,
-                                       length(ugarchroll@model$data)))]
-  )
-  as.numeric(rugarch::residuals(filtered_model, standardize = TRUE))
-}
-
 # For now analyze the residuals of every first of each asset.
 missl_resid_plots <- sapply(
   setdiff(names(msci_spain_complete_data),
           c("msci_spain_index", "iberdrola", "date")),
   function(asset_name) {
-    first_model_resid <- fitted_stand_resid(
+    # use again a utility function from the portvine package
+    first_model_resid <- roll_residuals(
       missl_fitted_marginals[[asset_name]], 1
     )
     
