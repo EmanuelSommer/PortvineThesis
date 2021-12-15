@@ -474,6 +474,82 @@ risk_estimates(missl_risk_roll,
     legend.position = "none")
 ```
 
+### Backtesting
+
+#### Backtesting Expected Shortfall
+
+Use the `esback` package for backtesting.
+
+```{r}
+# use the esback package for ES backtesting
+esback::er_backtest(
+  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(realized),
+  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(risk_est),
+  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "ES_mean") %>%
+    pull(risk_est)
+)[1:2]
+esback::cc_backtest(
+  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(realized),
+  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(risk_est),
+  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "ES_mean") %>%
+    pull(risk_est),
+  alpha = 0.05
+)[1:2]
+esback::esr_backtest(
+  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(realized),
+  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(risk_est),
+  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "ES_mean") %>%
+    pull(risk_est),
+  alpha = 0.05,
+  version = 2,
+  B = 100
+)
+esback::esr_backtest(
+  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(realized),
+  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "VaR") %>%
+    pull(risk_est),
+  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
+    filter(risk_measure == "ES_mean") %>%
+    pull(risk_est),
+  alpha = 0.05,
+  version = 1,
+  B = 100
+)
+# visualize the exceedance residuals tested with er_backtest
+risk_estimates(missl_risk_roll, alpha = 0.05, exceeded = TRUE) %>%
+  inner_join(risk_estimates(missl_risk_roll, alpha = 0.05, exceeded = TRUE) %>%
+               filter(exceeded & risk_measure == "VaR") %>%
+               select(row_num),
+             by = "row_num") %>%
+  filter(risk_measure %in% c("ES_mean")) %>%
+  mutate(exceed_resid = realized - risk_est) %>%
+  ggplot(aes(x = exceed_resid)) + 
+  geom_histogram(bins = 40, alpha = 0.3) +
+  labs(x = "Exceedance residuals") +
+  geom_density() +
+  geom_vline(aes(xintercept = mean(exceed_resid)), col = yes_no_cols[1],
+             size = 1)
+```
+
+
 Also fit the unconditional `missl` portfolio with only D vine copulas allowed to compare these D vines with the then conditional ones.
 
 ```{r}
@@ -679,6 +755,9 @@ risk_estimates(missl_risk_roll,
 ```
 
 So in the direct comparison the conditional risk measure is way more conservative and might help in stresstesting situations for projected hard times of specific conditional assets.
+
+
+
 
 
 ## Double conditional short trial
