@@ -796,7 +796,7 @@ future::plan("sequential")
 
 ```{r}
 summary(cond2test_risk_roll)
-risk_estimates(cond2test_risk_roll)
+head(risk_estimates(cond2test_risk_roll))
 ```
 
 
