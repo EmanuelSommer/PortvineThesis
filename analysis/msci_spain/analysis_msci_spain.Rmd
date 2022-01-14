@@ -455,7 +455,7 @@ missl_cond_risk_roll <- estimate_risk_roll(
   n_samples = 1000,
   n_mc_samples = 1000,
   cond_vars = "iberdrola",
-  cond_alpha = c(0.05, 0.5),
+  cond_u = c(0.05, 0.5),
   trace = TRUE
 )
 future::plan("sequential")
@@ -498,9 +498,9 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
     data = msci_spain_complete_data[1001:nrow(msci_spain_complete_data), ],
     aes(x = 1001:nrow(msci_spain_complete_data),
         y = iberdrola), col = "lightgrey", size = .3) +
-  geom_line(aes(x = row_num, y = iberdrola, col = factor(cond_alpha)),
+  geom_line(aes(x = row_num, y = iberdrola, col = factor(cond_u)),
             size = 0.5) +
-  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+  scale_color_manual(values = c(yes_no_cols[1], "#477042", "violet"),
                      name = "Conditional alpha level") +
   labs(title = "Conditional variable: Iberdrola",
        x = "estimation window", y = "log returns") +
@@ -516,12 +516,12 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
   geom_line(aes(x = row_num, y = risk_est,
-                col = factor(cond_alpha), linetype = factor(cond_alpha)),
+                col = factor(cond_u), linetype = factor(cond_u)),
             size = 0.5) +
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Conditional alpha level",
        title = "Comparison of risk measure behaivior for 2 conditional alpha levels") +
-  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+  scale_color_manual(values = c(yes_no_cols[1], "#477042", "violet"),
                      name = "Conditional alpha level") +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
@@ -532,7 +532,7 @@ A close look wrt exceedences.
 
 ```{r}
 risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_alpha = 0.5,
+               cond_u = 0.5,
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
@@ -555,7 +555,7 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
     legend.position = "none")
 
 risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_alpha = 0.05,
+               cond_u = 0.05,
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
@@ -640,7 +640,7 @@ cond2test_risk_roll <- estimate_risk_roll(
   n_samples = 1000,
   n_mc_samples = 1000,
   cond_vars = c("iberdrola", "banco_santander"),
-  cond_alpha = c(0.05, 0.5),
+  cond_u = c(0.05, 0.5),
   trace = TRUE
 )
 future::plan("sequential")
