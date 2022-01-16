@@ -22,7 +22,7 @@ library(tidyverse)
 # arrange ggplots nicely
 library(patchwork)
 # utility color vector for visualizations
-yes_no_cols <- c("#92B8DE", "#db4f59")
+custom_colors <- c("#92B8DE", "#db4f59", "#477042", "#cc72d6")
 theme_set(
   theme_minimal() +
   theme(plot.title = ggtext::element_markdown(size = 11),
@@ -50,17 +50,17 @@ msci_spain_data %>%
   ggplot() +
   geom_point(aes(x = date, y = factor(name), col = missing),
              shape = 15, size = 10) +
-  scale_color_manual(values = yes_no_cols) +
+  scale_color_manual(values = custom_colors[1:2]) +
   scale_y_discrete(labels = ~ str_to_title(str_replace_all(.x, "_", " "))) +
   guides(col = "none") +
   labs(x = "", y = "",
        title = paste("Display asset returns that are ",
                      "<span style='color:",
-                     yes_no_cols[1],
+                     custom_colors[1],
                      "'>**available**</span>",
                      " or ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**missing**</span>",
                      "."))
   
@@ -270,7 +270,7 @@ risk_estimates(missl_risk_roll,
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Risk measure",
        title = "Comparison of risk measure behaivior for alpha level 0.01") +
-  scale_color_manual(values = c(yes_no_cols[1], "#477042"),
+  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
                      name = "Risk measure") +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
@@ -283,15 +283,15 @@ risk_estimates(missl_risk_roll,
                exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**red**</span>",
                      "."),
        title = "Risk measure: VaR with alpha level 0.01"
@@ -307,15 +307,15 @@ risk_estimates(missl_risk_roll,
                exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**red**</span>",
                      "."),
        title = "Risk measure: ES (mean estimation) with alpha level 0.01"
@@ -397,7 +397,7 @@ risk_estimates(missl_risk_roll, alpha = 0.05, exceeded = TRUE) %>%
   geom_histogram(bins = 40, alpha = 0.3) +
   labs(x = "Exceedance residuals") +
   geom_density() +
-  geom_vline(aes(xintercept = mean(exceed_resid)), col = yes_no_cols[1],
+  geom_vline(aes(xintercept = mean(exceed_resid)), col = custom_colors[1],
              size = 1)
 ```
 
@@ -492,6 +492,7 @@ labeled_vinecop_plot(fitted_vines(missl_cond_risk_roll)[[28]])
 ```{r}
 # what about the evolution of the conditional values (iberdrola)
 risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_u = c(0.05, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(
@@ -500,18 +501,45 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
         y = iberdrola), col = "lightgrey", size = .3) +
   geom_line(aes(x = row_num, y = iberdrola, col = factor(cond_u)),
             size = 0.5) +
-  scale_color_manual(values = c(yes_no_cols[1], "#477042", "violet"),
+  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
                      name = "Conditional alpha level") +
   labs(title = "Conditional variable: Iberdrola",
        x = "estimation window", y = "log returns") +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
+
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_u = c("prior_resid"),
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(
+    data = msci_spain_complete_data[1001:nrow(msci_spain_complete_data), ],
+    aes(x = 1001:nrow(msci_spain_complete_data),
+        y = iberdrola), col = "lightgrey", size = .3) +
+  geom_line(aes(x = row_num, y = iberdrola),
+            col = custom_colors[4],
+            size = 0.5) +
+  labs(title = "Conditional variable: Iberdrola",
+       x = "estimation window", y = "log returns",
+       subtitle = paste0("The conditional values corresponding to the residual
+                         of the prior day are drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".")) +
+  theme_light() +
+  ggforce::facet_zoom(xlim = c(1300, 1330)) +
+  theme(axis.text.x = element_blank(),
+        panel.border = element_blank(),
+        plot.subtitle = ggtext::element_markdown(size = 9),
+        axis.ticks.x = element_blank())
 ```
 
-Nice to see so we expect the corresponding conditional risk measures with low conditional $\alpha$ level to be way more conservative under the assumption that Iberdrola has a generally positive dependence with the portfolio of interest. Therefore look at the next plot.
+Nice to see so we expect the corresponding conditional risk measures with low conditional $\alpha$ level to be way more conservative under the assumption that Iberdrola has a generally positive dependence with the portfolio of interest. Moreover one can observe that the conditional values corresponding to the prior day residuals are closely following the observed path while lagging a little behind and thus exaggerating sudden drops or highs which might be a desirable behavior for risk estimation. Therefore look at the next plots.
 
 ```{r}
 risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_u = c(0.05, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
@@ -520,9 +548,22 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
             size = 0.5) +
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Conditional alpha level",
-       title = "Comparison of risk measure behaivior for 2 conditional alpha levels") +
-  scale_color_manual(values = c(yes_no_cols[1], "#477042", "violet"),
+       title = "Comparison of risk measure behavior for 2 conditional alpha levels") +
+  scale_color_manual(values = c(custom_colors[1], custom_colors[3], "violet"),
                      name = "Conditional alpha level") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est),
+            col = custom_colors[4],
+            size = 0.5) +
+  labs(x = "estimation window", y = "portfolio log returns",
+       title = "Behavior of the conditional pior residual risk measure") +
   theme(axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
 ```
@@ -536,15 +577,15 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**red**</span>",
                      "."),
        title = "Risk measure: ES (mean estimation) with alpha level 0.05, conditional alpha level 0.5"
@@ -559,18 +600,41 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
                alpha = 0.05, exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**red**</span>",
                      "."),
        title = "Risk measure: ES (mean estimation) with alpha and conditional alpha level 0.05"
+       ) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "none")
+
+risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.05, exceeded = TRUE) %>%
+  ggplot() +
+  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES (mean estimation) with alpha and prior residual conditional level"
        ) +
   theme(
     axis.text.x = element_blank(),
@@ -587,15 +651,15 @@ risk_estimates(missl_risk_roll,
                exceeded = TRUE) %>%
   ggplot() +
   geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = yes_no_cols[1]) +
-  geom_point(aes(x = row_num, y = realized), col = yes_no_cols[2], 
+  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
                      "<span style='color:",
-                     yes_no_cols[2],
+                     custom_colors[2],
                      "'>**red**</span>",
                      "."),
        title = "Risk measure: ES (mean estimation) with alpha level 0.05"
