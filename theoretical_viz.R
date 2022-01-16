@@ -44,7 +44,7 @@ tibble(x = 1:200,
   geom_smooth(se = FALSE, col = my_blue, size = 1.3,
               method = "loess", formula = "y ~ x", span = 1000) +
   labs(x = "t", y = expression(x[t]),
-       title = "Exemplary weakly stationary time series with loess smoothing line") +
+       title = "Exemplary weakly stationary time series with LOESS smoothing line") +
   theme_light() +
   theme(panel.grid.minor.y = element_blank(),
         panel.grid.minor.x = element_blank(),
