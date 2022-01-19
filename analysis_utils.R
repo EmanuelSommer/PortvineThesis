@@ -39,7 +39,7 @@ marg_resid_viz_list <- function(roll, asset_names = NULL, marg_window = 1,
         geom_hline(yintercept = 0, col = "black", size = 0.3) +
         geom_hline(yintercept = qnorm(c(0.025, 0.975)) /
                      sqrt(length(model_resid)),
-                   linetype = "longdash", col = yes_no_cols[1], size = 0.5) +
+                   linetype = "longdash", col = custom_colors[1], size = 0.5) +
         geom_segment(aes(x = lag, xend = lag, y = 0, yend = acf)) +
         geom_point(aes(x = lag, y = acf)) +
         scale_x_continuous(breaks = seq(1, 10, 1)) +
@@ -55,7 +55,7 @@ marg_resid_viz_list <- function(roll, asset_names = NULL, marg_window = 1,
         ggplot() +
         geom_hline(yintercept = 0, col = "black", size = 0.3) +
         geom_hline(yintercept = 0.05,
-                   linetype = "longdash", col = yes_no_cols[1], size = 0.5) +
+                   linetype = "longdash", col = custom_colors[1], size = 0.5) +
         geom_line(aes(x = lag, y = pval)) +
         geom_point(aes(x = lag, y = pval)) +
         scale_x_continuous(breaks = seq(1, 10, 1)) +
@@ -91,8 +91,8 @@ ljung_heatmap <- function(roll, roll_num = 1) {
     labs(y = "", x = "h", fill = "p-value",
          title = "Results of the Ljung-Box tests",
          caption = paste("Rolling window:", roll_num)) +
-    scale_fill_gradientn(colours = c(yes_no_cols[2],"#C37285" ,
-                                     yes_no_cols[1], "#2a82db"),
+    scale_fill_gradientn(colours = c(custom_colors[2],"#C37285" ,
+                                     custom_colors[1], "#2a82db"),
                          values = scales::rescale(c(0, 0.05 - 0.01,
                                                     0.05, 1)),
                          breaks = c(0.05),
@@ -137,8 +137,8 @@ ljung_heatmap_animation <- function(roll) {
     labs(y = "", x = "h", fill = "p-value",
          title = "Results of the Ljung-Box tests",
          caption = "Rolling window: {closest_state}") +
-    scale_fill_gradientn(colours = c(yes_no_cols[2],"#C37285" ,
-                                     yes_no_cols[1], "#2a82db"),
+    scale_fill_gradientn(colours = c(custom_colors[2],"#C37285" ,
+                                     custom_colors[1], "#2a82db"),
                          values = scales::rescale(c(0, 0.05 - 0.01,
                                                     0.05, 1)),
                          breaks = c(0.05),
@@ -159,18 +159,10 @@ ljung_heatmap_animation <- function(roll) {
 
 
 # utility function for labeled vinecop tree plots
-labeled_vinecop_plot <- function(vine) {
-  node_labels <- vine$names[vine$structure$order]
-  ff <- tempfile()
-  png(filename = ff)
-  plot <- rvinecopulib:::plot.vinecop(vine)
-  dev.off()
-  unlink(ff)
-  plot$data$name <- str_to_title(str_replace_all(node_labels, "_", " "))
-  plot
-  # ggraph::geom_node_label(
-  #   aes(label = str_to_title(str_replace_all(node_labels, "_", " ")))
-  # )
+labeled_vinecop_plot <- function(vine, tree = 1) {
+  rvinecopulib:::plot.vinecop(vine, tree = tree,
+                              var_names = "use",
+                              edge_labels = "family_tau")
 }
 # utility for table of used bivariate copula families
 bicops_used <- function(vine) {
