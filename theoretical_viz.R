@@ -361,6 +361,22 @@ for (family in c("indep", "gaussian", "t",
     )
     title(main = paste("Copula family:", "Joe"),
           sub = "Rotation: 90° and strong dependence")
+    contour(
+      bicop_dist(
+        family = "joe", rotation = 180,
+        parameters = ktau_to_par(family = "joe", tau = 0.8)
+      )
+    )
+    title(main = paste("Copula family:", "Joe"),
+          sub = "Rotation: 180° and strong dependence")
+    contour(
+      bicop_dist(
+        family = "joe", rotation = 270,
+        parameters = ktau_to_par(family = "joe", tau = 0.8)
+      )
+    )
+    title(main = paste("Copula family:", "Joe"),
+          sub = "Rotation: 270° and strong dependence")
   }
 }
 dev.off()
