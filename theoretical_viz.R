@@ -298,3 +298,70 @@ ggplot() +
         axis.ticks = element_blank(),
         panel.grid.major = element_line(colour = "grey", size = .9),
         axis.text = element_text(size = 15))
+
+### Bivariate copulas contours
+
+library(rvinecopulib)
+old_par <- par()
+png(filename = "img/bivar_cop_cont.png", res = 150,
+    width = 1600, height = 1600)
+par(pty = "s", mfrow = c(4, 4))
+for (family in c("indep", "gaussian", "t",
+                 "clayton", "gumbel", "frank", "joe")) {
+  if (family == "indep") {
+    contour(
+      bicop_dist(
+        family = "indep", rotation = 0,
+        parameters = ktau_to_par(family = "indep", tau = 0.2)
+      )
+    )
+    title(main = "Copula family: Independence", sub = "Rotation: 0°")
+  } else if (family == "t") {
+    contour(
+      bicop_dist(
+        family = "t", rotation = 0,
+        parameters = matrix(c(0.2, 3), byrow = TRUE, ncol = 1)
+      )
+    )
+    title(main = paste("Copula family:", "Student t"),
+          sub = "Rotation: 0° and weak dependence")
+    contour(
+      bicop_dist(
+        family = "t", rotation = 0,
+        parameters = matrix(c(0.9, 3), byrow = TRUE, ncol = 1)
+      )
+    )
+    title(main = paste("Copula family:", "Student t"),
+          sub = "Rotation: 0° and strong dependence")
+  } else {
+    label <- str_to_title(family)
+    contour(
+      bicop_dist(
+        family = family, rotation = 0,
+        parameters = ktau_to_par(family = family, tau = 0.2)
+      )
+    )
+    title(main = paste("Copula family:", label),
+          sub = "Rotation: 0° and weak dependence")
+    contour(
+      bicop_dist(
+        family = family, rotation = 0,
+        parameters = ktau_to_par(family = family, tau = 0.8)
+      )
+    )
+    title(main = paste("Copula family:", label),
+          sub = "Rotation: 0° and strong dependence")
+  }
+  if (family == "joe") {
+    contour(
+      bicop_dist(
+        family = "joe", rotation = 90,
+        parameters = ktau_to_par(family = "joe", tau = 0.8)
+      )
+    )
+    title(main = paste("Copula family:", "Joe"),
+          sub = "Rotation: 90° and strong dependence")
+  }
+}
+dev.off()
+suppressWarnings(par(old_par))
