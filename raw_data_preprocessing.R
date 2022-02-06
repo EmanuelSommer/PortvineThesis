@@ -182,6 +182,65 @@ ggplot(msci_spain_data, aes(x = date, y = msci_spain_index)) +
 msci_spain_complete_data <- msci_spain_data %>%
   filter(date >= first_not_NA_row_msci_spain)
 
-save(msci_spain_data, msci_spain_complete_data,
+
+
+range(msci_spain_complete_data$date)
+
+# add data from the S&P500
+# data source publicly available:
+# https://www.nasdaq.com/de/market-activity/index/spx/historical
+
+sp500_data <- read_csv("data/SP500.csv")
+sp500_data <- sp500_data %>%
+  transmute(date = lubridate::mdy(Datum),
+            sp500 = `Schluss/Letzter`) %>%
+  mutate(across(!date, ~ log(.x / lag(.x))))
+# append the log returns
+msci_spain_complete_data <- msci_spain_complete_data %>%
+  left_join(sp500_data, by = "date")
+
+# add data from EUROSTOXX 50
+# data source publicly available:
+# https://de.finance.yahoo.com/quote/%5ESTOXX50E?p=%5ESTOXX50E
+
+eurostoxx50_data <- read_csv("data/STOXX50E.csv")
+eurostoxx50_data <- eurostoxx50_data %>%
+  transmute(date = Date,
+            eurostoxx50 = Close) %>%
+  mutate(across(!date, ~ log(.x / lag(.x))))
+# append the log returns
+msci_spain_complete_data <- msci_spain_complete_data %>%
+  left_join(eurostoxx50_data, by = "date")
+
+msci_spain_complete_data %>%
+  summarize(across(everything(), ~sum(is.na(.x)))) %>%
+  pivot_longer(everything())
+
+# notably there are some missing values apparent. As the closing price of the
+# last available day is then still considered to be the valuation one has
+# no price movement. This means that for these days an imputation with 0 is
+# needed. In the data from Reuters they have apparently used exactly this method
+msci_spain_complete_data[is.na(msci_spain_complete_data)] <- 0
+# the most recent date (corresponding row) however has to be omitted due
+# to the fact that the eurostoxx data was just collected here from this day on
+# so an imputation is not correct in that case
+msci_spain_complete_data <- msci_spain_complete_data[-1, ]
+range(msci_spain_complete_data$date)
+
+ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
+  geom_line() +
+  labs(x = "", y = "Daily log return",
+       title = "MSCI Spain index") +
+  theme_minimal() +
+  theme(plot.title = ggtext::element_markdown(size = 11),
+        plot.subtitle = ggtext::element_markdown(size = 9))
+
+msci_spain_16_19 <- msci_spain_complete_data %>%
+  filter(lubridate::year(date) %in% 2016:2019)
+
+msci_spain_17_20 <- msci_spain_complete_data %>%
+  filter(lubridate::year(date) %in% 2017:2020)
+
+save(msci_spain_complete_data, msci_spain_16_19, msci_spain_17_20,
      file = "data/msci_spain_data_clean.RData")
 
