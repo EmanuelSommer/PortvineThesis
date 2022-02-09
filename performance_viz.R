@@ -86,10 +86,15 @@ uncond_results_df %>%
 ###  now the same for the conditional approach
 # load the performance results:
 load("data/performance_cond.RData")
-results_df
-cond_results_df <- results_df[-1, ] %>%
+cond_results_df <- results_df[-1, ]
+load("data/performance_cond2.RData")
+cond_results_df <- cond_results_df %>%
+  bind_rows(results_df[-1, ]) %>%
   mutate(family = as.character(family))
-cond_results_df[20:22, "family"] <- c("gaussian", "t", "onepar")
+cond_results_df[15:17, "family"] <- c("gaussian", "t", "onepar")
+load("data/performance_cond3.RData")
+cond_results_df <- cond_results_df %>%
+  bind_rows(results_df[-1, ] %>% mutate(family = as.character(family)))
 cond_results_df <- cond_results_df %>%
   mutate(parallel_strategy = paste0(first_level_parallel,
                                     "-",
@@ -99,6 +104,25 @@ cond_results_df <- cond_results_df %>%
 # compare sample sizes
 cond_results_df %>%
   filter(family == "parametric", vars == 10) %>%
+  mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
+  ggplot(aes(x = factor(parallel_strategy,
+                        levels = c("5-1", "10-1", "4-6", "5-4",
+                                   "10-2", "10-3", "10-4")),
+             y = time_minutes,
+             group = n_samples,
+             col = n_samples, shape = n_samples)) +
+  geom_point(size = 2) +
+  geom_line(alpha = 0.4) +
+  ylim(0, NA) +
+  scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
+  labs(x = "Parallel stratgey: first-second level parallelization",
+       y = "Runtime in minutes",
+       shape = "Sample size",
+       title = "Influence of the sample size on runtime",
+       subtitle = "Number of variables: 10\nAllowed copula families: all parametric\nEstimation: conditional")
+# without the 100000
+cond_results_df %>%
+  filter(family == "parametric", vars == 10, n_samples != "1e+05") %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
                         levels = c("5-1", "10-1", "4-6", "5-4",
@@ -125,7 +149,7 @@ cond_results_df %>%
   ggplot(aes(x = vars, y = time_minutes)) +
   geom_point(size = 2) +
   geom_line(alpha = 0.4) +
-  scale_x_continuous(breaks = unique(as.numeric(uncond_results_df$vars))) +
+  scale_x_continuous(breaks = unique(as.numeric(cond_results_df$vars))) +
   ylim(0, NA) +
   labs(y = "Runtime in minutes",
        x = "Number of variables",
@@ -159,3 +183,18 @@ cond_results_df %>%
        title = "Influence of the allowed copula families on runtime",
        subtitle = "Sample size: 10000\nNumber of variables: 10\nEstimation: conditional\nParallel strategy: 10-2"
   )
+
+tibble(x = c(2, 5, 10),
+       y = c(cond_results_df$time_minutes[19],
+             cond_u_5_10000, cond_u_10_10000)) %>%
+  ggplot(aes(x = x, y = y)) +
+  geom_point(size = 2) +
+  geom_line(alpha = 0.4) +
+  scale_x_continuous(breaks = c(2, 5, 10)) +
+  ylim(0, NA) +
+  labs(y = "Runtime in minutes",
+       x = "Number of quantile levels estimated",
+       title = "Influence of the number of estimated quantile levels on runtime",
+       subtitle = "Sample size: 10000\nAllowed copula families: all parametric\nEstimation: conditional\nParallel strategy: 10-4\nNumber of variables: 10"
+  ) +
+  theme(panel.grid.minor.x = element_blank())
