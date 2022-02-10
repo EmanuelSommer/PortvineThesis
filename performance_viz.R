@@ -12,6 +12,15 @@ results_df
 uncond_results_df <- results_df[-1, ] %>%
   mutate(family = as.character(family))
 uncond_results_df[20:22, "family"] <- c("gaussian", "t", "onepar")
+load("data/performance_heavy_second.RData")
+uncond_results_df <- uncond_results_df %>%
+  bind_rows(results_df[2:4, 1:6] %>%
+              mutate(family = as.character(family)))
+load("data/performance_max.RData")
+uncond_results_df <- uncond_results_df %>%
+  bind_rows(results_df[2:4, 1:6] %>%
+              mutate(family = as.character(family)))
+
 uncond_results_df <- uncond_results_df %>%
   mutate(parallel_strategy = paste0(first_level_parallel,
                                     "-",
@@ -23,8 +32,8 @@ uncond_results_df %>%
   filter(family == "parametric", vars == 10) %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4",
-                                   "10-2", "10-3", "10-4")),
+                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
+                                   "10-2", "10-3", "10-4", "10-25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
@@ -95,6 +104,15 @@ cond_results_df[15:17, "family"] <- c("gaussian", "t", "onepar")
 load("data/performance_cond3.RData")
 cond_results_df <- cond_results_df %>%
   bind_rows(results_df[-1, ] %>% mutate(family = as.character(family)))
+load("data/performance_heavy_second.RData")
+cond_results_df <- cond_results_df %>%
+  bind_rows(results_df[5:7, 1:6] %>%
+              mutate(family = as.character(family)))
+load("data/performance_max.RData")
+cond_results_df <- cond_results_df %>%
+  bind_rows(results_df[5:7, 1:6] %>%
+              mutate(family = as.character(family)))
+
 cond_results_df <- cond_results_df %>%
   mutate(parallel_strategy = paste0(first_level_parallel,
                                     "-",
@@ -106,8 +124,8 @@ cond_results_df %>%
   filter(family == "parametric", vars == 10) %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4",
-                                   "10-2", "10-3", "10-4")),
+                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
+                                   "10-2", "10-3", "10-4", "10-25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
@@ -115,6 +133,11 @@ cond_results_df %>%
   geom_line(alpha = 0.4) +
   ylim(0, NA) +
   scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
+  geom_segment(aes(x = 7.5, y = 80, xend = 8.9, yend = 35),
+               arrow = arrow(length = unit(0.3, "cm")),
+               col = "#6e6e6e") +
+  annotate("text", x = 6.8, y = 90, size = 3.5, col = "#6e6e6e",
+           label = "Only 1 estimated\nquantile level\ninstead of 2") +
   labs(x = "Parallel stratgey: first-second level parallelization",
        y = "Runtime in minutes",
        shape = "Sample size",
@@ -125,8 +148,8 @@ cond_results_df %>%
   filter(family == "parametric", vars == 10, n_samples != "1e+05") %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4",
-                                   "10-2", "10-3", "10-4")),
+                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
+                                   "10-2", "10-3", "10-4", "10-25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
