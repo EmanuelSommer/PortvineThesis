@@ -28,14 +28,14 @@ weights_values <- c(
 )
 
 # choose the parallel strategy
-future::plan(list(future::tweak(future::multicore, workers = 10),
-                  future::tweak(future::multicore, workers = 25)))
+future::plan(list(future::tweak(future::multicore, workers = 12),
+                  future::tweak(future::multicore, workers = 13)))
 ## 2016-2019 data set
 uncond_risk_roll_16_19_g50_k25_p500 <- estimate_risk_roll(
   data = msci_spain_16_19[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 792,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -53,7 +53,7 @@ uncond_risk_roll_16_19_g50_k50_p500 <- estimate_risk_roll(
   data = msci_spain_16_19[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 792,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -67,29 +67,11 @@ uncond_risk_roll_16_19_g50_k50_p500 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_16_19_g25_k25_p500 <- estimate_risk_roll(
-  data = msci_spain_16_19[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 792,
-    refit_size = 25
-  ),
-  vine_settings = vine_settings(
-    train_size = 500,
-    refit_size = 25,
-    family_set = "parametric"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
-
 uncond_risk_roll_16_19_g50_k25_p250 <- estimate_risk_roll(
   data = msci_spain_16_19[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 792,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -107,7 +89,7 @@ uncond_risk_roll_16_19_g50_k50_p250 <- estimate_risk_roll(
   data = msci_spain_16_19[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 792,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -121,30 +103,12 @@ uncond_risk_roll_16_19_g50_k50_p250 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_16_19_g25_k25_p250 <- estimate_risk_roll(
-  data = msci_spain_16_19[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 792,
-    refit_size = 25
-  ),
-  vine_settings = vine_settings(
-    train_size = 250,
-    refit_size = 25,
-    family_set = "parametric"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
-
 ## 2017-2020 data set
 uncond_risk_roll_17_20_g50_k25_p500 <- estimate_risk_roll(
   data = msci_spain_17_20[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 793,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -162,7 +126,7 @@ uncond_risk_roll_17_20_g50_k50_p500 <- estimate_risk_roll(
   data = msci_spain_17_20[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 793,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -176,29 +140,12 @@ uncond_risk_roll_17_20_g50_k50_p500 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_17_20_g25_k25_p500 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 793,
-    refit_size = 25
-  ),
-  vine_settings = vine_settings(
-    train_size = 500,
-    refit_size = 25,
-    family_set = "parametric"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
 
 uncond_risk_roll_17_20_g50_k25_p250 <- estimate_risk_roll(
   data = msci_spain_17_20[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 793,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -216,7 +163,7 @@ uncond_risk_roll_17_20_g50_k50_p250 <- estimate_risk_roll(
   data = msci_spain_17_20[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 793,
+    train_size = 750,
     refit_size = 50
   ),
   vine_settings = vine_settings(
@@ -230,38 +177,17 @@ uncond_risk_roll_17_20_g50_k50_p250 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_17_20_g25_k25_p250 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 793,
-    refit_size = 25
-  ),
-  vine_settings = vine_settings(
-    train_size = 250,
-    refit_size = 25,
-    family_set = "parametric"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
 
 future::plan("sequential")
 
 save(
   uncond_risk_roll_16_19_g50_k25_p250,
-  uncond_risk_roll_16_19_g25_k25_p250,
   uncond_risk_roll_16_19_g50_k50_p250,
   uncond_risk_roll_16_19_g50_k25_p500,
-  uncond_risk_roll_16_19_g25_k25_p500,
   uncond_risk_roll_16_19_g50_k50_p500,
   uncond_risk_roll_17_20_g50_k25_p250,
-  uncond_risk_roll_17_20_g25_k25_p250,
   uncond_risk_roll_17_20_g50_k50_p250,
   uncond_risk_roll_17_20_g50_k25_p500,
-  uncond_risk_roll_17_20_g25_k25_p500,
   uncond_risk_roll_17_20_g50_k50_p500,
   file = "msci_spain_uncond_res.RData"
 )
