@@ -101,3 +101,12 @@ uncond_risk_roll_17_20_t <- estimate_risk_roll(
   n_samples = 100000,
   n_mc_samples = 10000
 )
+
+future::plan("sequential")
+
+save(
+  uncond_risk_roll_16_19_gaussian, uncond_risk_roll_17_20_gaussian,
+  uncond_risk_roll_16_19_t, uncond_risk_roll_17_20_t,
+  file = "msci_spain_uncond_gausst.RData"
+)
+
