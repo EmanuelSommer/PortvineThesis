@@ -108,7 +108,7 @@ temp <- estimate_risk_roll(
   data = data_10vars,
   weights = NULL,
   marginal_settings = cond_marg,
-  vine_settings = vine_settings(200, 25, family_set = "gaussian",
+  vine_settings = vine_settings(200, 25, family_set = c("t", "gaussian"),
                                 vine_type = "dvine"),
   alpha = c(0.01, 0.025),
   risk_measures = c("VaR", "ES_mean"),
@@ -117,7 +117,7 @@ temp <- estimate_risk_roll(
   cond_u = c(0.05, 0.5)
 )
 results_df <- rbind(results_df,
-                    c(10, 2, 10, "gaussian", 10000, temp@time_taken))
+                    c(10, 2, 10, "gaussian/t", 10000, temp@time_taken))
 
 temp <- estimate_risk_roll(
   data = data_10vars,

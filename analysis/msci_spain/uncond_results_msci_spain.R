@@ -103,16 +103,16 @@ uncond_risk_roll_16_19_g50_k50_p250 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-## 2017-2020 data set
-uncond_risk_roll_17_20_g50_k25_p500 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
+## 2020-21 data set
+uncond_risk_roll_20_21_g50_k25_p100 <- estimate_risk_roll(
+  data = msci_spain_20_21[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 750,
+    train_size = 300,
     refit_size = 50
   ),
   vine_settings = vine_settings(
-    train_size = 500,
+    train_size = 100,
     refit_size = 25,
     family_set = "parametric"
   ),
@@ -122,15 +122,15 @@ uncond_risk_roll_17_20_g50_k25_p500 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_17_20_g50_k50_p500 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
+uncond_risk_roll_20_21_g50_k50_p100 <- estimate_risk_roll(
+  data = msci_spain_20_21[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 750,
+    train_size = 300,
     refit_size = 50
   ),
   vine_settings = vine_settings(
-    train_size = 500,
+    train_size = 100,
     refit_size = 50,
     family_set = "parametric"
   ),
@@ -141,15 +141,15 @@ uncond_risk_roll_17_20_g50_k50_p500 <- estimate_risk_roll(
 )
 
 
-uncond_risk_roll_17_20_g50_k25_p250 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
+uncond_risk_roll_20_21_g50_k25_p200 <- estimate_risk_roll(
+  data = msci_spain_20_21[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 750,
+    train_size = 300,
     refit_size = 50
   ),
   vine_settings = vine_settings(
-    train_size = 250,
+    train_size = 200,
     refit_size = 25,
     family_set = "parametric"
   ),
@@ -159,15 +159,15 @@ uncond_risk_roll_17_20_g50_k25_p250 <- estimate_risk_roll(
   n_mc_samples = 10000
 )
 
-uncond_risk_roll_17_20_g50_k50_p250 <- estimate_risk_roll(
-  data = msci_spain_17_20[, 3:11],
+uncond_risk_roll_20_21_g50_k50_p200 <- estimate_risk_roll(
+  data = msci_spain_20_21[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
-    train_size = 750,
+    train_size = 300,
     refit_size = 50
   ),
   vine_settings = vine_settings(
-    train_size = 250,
+    train_size = 200,
     refit_size = 50,
     family_set = "parametric"
   ),
@@ -185,9 +185,9 @@ save(
   uncond_risk_roll_16_19_g50_k50_p250,
   uncond_risk_roll_16_19_g50_k25_p500,
   uncond_risk_roll_16_19_g50_k50_p500,
-  uncond_risk_roll_17_20_g50_k25_p250,
-  uncond_risk_roll_17_20_g50_k50_p250,
-  uncond_risk_roll_17_20_g50_k25_p500,
-  uncond_risk_roll_17_20_g50_k50_p500,
+  uncond_risk_roll_20_21_g50_k25_p100,
+  uncond_risk_roll_20_21_g50_k50_p100,
+  uncond_risk_roll_20_21_g50_k25_p200,
+  uncond_risk_roll_20_21_g50_k50_p200,
   file = "msci_spain_uncond_res.RData"
 )

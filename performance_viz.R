@@ -11,7 +11,7 @@ load("data/performance_uncond.RData")
 results_df
 uncond_results_df <- results_df[-1, ] %>%
   mutate(family = as.character(family))
-uncond_results_df[20:22, "family"] <- c("gaussian", "t", "onepar")
+uncond_results_df[20:22, "family"] <- c("gaussian/t", "t", "onepar")
 load("data/performance_heavy_second.RData")
 uncond_results_df <- uncond_results_df %>%
   bind_rows(results_df[2:4, 1:6] %>%
@@ -23,7 +23,7 @@ uncond_results_df <- uncond_results_df %>%
 
 uncond_results_df <- uncond_results_df %>%
   mutate(parallel_strategy = paste0(first_level_parallel,
-                                    "-",
+                                    "/",
                                     second_level_parallel),
          time_minutes = as.numeric(time_minutes))
 
@@ -32,8 +32,8 @@ uncond_results_df %>%
   filter(family == "parametric", vars == 10) %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
-                                   "10-2", "10-3", "10-4", "10-25")),
+                        levels = c("5/1", "10/1", "4/6", "5/4", "1/25",
+                                   "10/2", "10/3", "10/4", "10/25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
@@ -41,18 +41,18 @@ uncond_results_df %>%
   geom_line(alpha = 0.4) +
   ylim(0, NA) +
   scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
-  labs(x = "Parallel stratgey: first-second level parallelization",
+  labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
        shape = "Sample size",
        title = "Influence of the sample size on runtime",
-       subtitle = "Number of variables: 10\nAllowed copula families: all parametric\nEstimation: unconditional")
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: unconditional")
 
 
 # compare number of variables
 uncond_results_df %>%
   mutate(vars = as.numeric(vars)) %>%
   filter(family == "parametric", n_samples == "10000",
-         parallel_strategy == "10-2") %>%
+         parallel_strategy == "10/2") %>%
   ggplot(aes(x = vars, y = time_minutes)) +
   geom_point(size = 2) +
   geom_line(alpha = 0.4) +
@@ -61,7 +61,7 @@ uncond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Number of variables",
        title = "Influence of the number of variables on runtime",
-       subtitle = "Sample size: 10000\nAllowed copula families: all parametric\nEstimation: unconditional\nParallel strategy: 10-2"
+       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: unconditional\nSample size: 10000\nParallel strategy: 10/2"
        ) +
   theme(panel.grid.minor.x = element_blank())
 
@@ -69,13 +69,13 @@ uncond_results_df %>%
 uncond_results_df %>%
   mutate(vars = as.numeric(vars),
          family = factor(family,
-                         levels = c("gaussian", "t",
+                         levels = c("gaussian/t", "t",
                                     "onepar", "parametric")),
-         family = fct_recode(family, "Student t" = "t", "Gaussian" = "gaussian",
+         family = fct_recode(family, "Student t" = "t", "Gaussian & Student t" = "gaussian/t",
                              "Single parametric" = "onepar",
                              "All parametric" = "parametric")) %>%
   filter(n_samples == "10000", vars == 10,
-         parallel_strategy == "10-2") %>%
+         parallel_strategy == "10/2") %>%
   ggplot(aes(x = family,
              y = time_minutes,
              group = 1)) +
@@ -88,7 +88,7 @@ uncond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Allowed copula families",
        title = "Influence of the allowed copula families on runtime",
-       subtitle = "Sample size: 10000\nNumber of variables: 10\nEstimation: unconditional\nParallel strategy: 10-2"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSample size: 10000\nParallel strategy: 10/2\nEstimation: unconditional"
        )
 
 #-------------------------------------------------------------------------
@@ -100,7 +100,7 @@ load("data/performance_cond2.RData")
 cond_results_df <- cond_results_df %>%
   bind_rows(results_df[-1, ]) %>%
   mutate(family = as.character(family))
-cond_results_df[15:17, "family"] <- c("gaussian", "t", "onepar")
+cond_results_df[15:17, "family"] <- c("gaussian/t", "t", "onepar")
 load("data/performance_cond3.RData")
 cond_results_df <- cond_results_df %>%
   bind_rows(results_df[-1, ] %>% mutate(family = as.character(family)))
@@ -115,7 +115,7 @@ cond_results_df <- cond_results_df %>%
 
 cond_results_df <- cond_results_df %>%
   mutate(parallel_strategy = paste0(first_level_parallel,
-                                    "-",
+                                    "/",
                                     second_level_parallel),
          time_minutes = as.numeric(time_minutes))
 
@@ -124,8 +124,8 @@ cond_results_df %>%
   filter(family == "parametric", vars == 10) %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
-                                   "10-2", "10-3", "10-4", "10-25")),
+                        levels = c("5/1", "10/1", "4/6", "5/4", "1/25",
+                                   "10/2", "10/3", "10/4", "10/25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
@@ -138,18 +138,18 @@ cond_results_df %>%
                col = "#6e6e6e") +
   annotate("text", x = 6.8, y = 90, size = 3.5, col = "#6e6e6e",
            label = "Only 1 estimated\nquantile level\ninstead of 2") +
-  labs(x = "Parallel stratgey: first-second level parallelization",
+  labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
        shape = "Sample size",
        title = "Influence of the sample size on runtime",
-       subtitle = "Number of variables: 10\nAllowed copula families: all parametric\nEstimation: conditional")
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional")
 # without the 100000
 cond_results_df %>%
   filter(family == "parametric", vars == 10, n_samples != "1e+05") %>%
   mutate(n_samples = if_else(n_samples == "1e+05", "100000", n_samples)) %>%
   ggplot(aes(x = factor(parallel_strategy,
-                        levels = c("5-1", "10-1", "4-6", "5-4", "1-25",
-                                   "10-2", "10-3", "10-4", "10-25")),
+                        levels = c("5/1", "10/1", "4/6", "5/4", "1/25",
+                                   "10/2", "10/3", "10/4", "10/25")),
              y = time_minutes,
              group = n_samples,
              col = n_samples, shape = n_samples)) +
@@ -157,18 +157,18 @@ cond_results_df %>%
   geom_line(alpha = 0.4) +
   ylim(0, NA) +
   scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
-  labs(x = "Parallel stratgey: first-second level parallelization",
+  labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
        shape = "Sample size",
        title = "Influence of the sample size on runtime",
-       subtitle = "Number of variables: 10\nAllowed copula families: all parametric\nEstimation: conditional")
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional")
 
 
 # compare number of variables
 cond_results_df %>%
   mutate(vars = as.numeric(vars)) %>%
   filter(family == "parametric", n_samples == "10000",
-         parallel_strategy == "10-2") %>%
+         parallel_strategy == "10/2") %>%
   ggplot(aes(x = vars, y = time_minutes)) +
   geom_point(size = 2) +
   geom_line(alpha = 0.4) +
@@ -177,7 +177,7 @@ cond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Number of variables",
        title = "Influence of the number of variables on runtime",
-       subtitle = "Sample size: 10000\nAllowed copula families: all parametric\nEstimation: conditional\nParallel strategy: 10-2"
+       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional\nSample size: 10000\nParallel strategy: 10/2"
   ) +
   theme(panel.grid.minor.x = element_blank())
 
@@ -185,13 +185,13 @@ cond_results_df %>%
 cond_results_df %>%
   mutate(vars = as.numeric(vars),
          family = factor(family,
-                         levels = c("gaussian", "t",
+                         levels = c("gaussian/t", "t",
                                     "onepar", "parametric")),
-         family = fct_recode(family, "Student t" = "t", "Gaussian" = "gaussian",
+         family = fct_recode(family, "Student t" = "t", "Gaussian & Student t" = "gaussian/t",
                              "Single parametric" = "onepar",
                              "All parametric" = "parametric")) %>%
   filter(n_samples == "10000", vars == 10,
-         parallel_strategy == "10-2") %>%
+         parallel_strategy == "10/2") %>%
   ggplot(aes(x = family,
              y = time_minutes,
              group = 1)) +
@@ -204,7 +204,7 @@ cond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Allowed copula families",
        title = "Influence of the allowed copula families on runtime",
-       subtitle = "Sample size: 10000\nNumber of variables: 10\nEstimation: conditional\nParallel strategy: 10-2"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSample size: 10000\nParallel strategy: 10/2\nEstimation: conditional"
   )
 
 tibble(x = c(2, 5, 10),
@@ -218,6 +218,6 @@ tibble(x = c(2, 5, 10),
   labs(y = "Runtime in minutes",
        x = "Number of quantile levels estimated",
        title = "Influence of the number of estimated quantile levels on runtime",
-       subtitle = "Sample size: 10000\nAllowed copula families: all parametric\nEstimation: conditional\nParallel strategy: 10-4\nNumber of variables: 10"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nSample size: 10000\nParallel strategy: 10/4\nEstimation: conditional"
   ) +
   theme(panel.grid.minor.x = element_blank())

@@ -227,20 +227,16 @@ msci_spain_complete_data[is.na(msci_spain_complete_data)] <- 0
 msci_spain_complete_data <- msci_spain_complete_data[-1, ]
 range(msci_spain_complete_data$date)
 
-ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
-  geom_line() +
-  labs(x = "", y = "Daily log return",
-       title = "MSCI Spain index") +
-  theme_minimal() +
-  theme(plot.title = ggtext::element_markdown(size = 11),
-        plot.subtitle = ggtext::element_markdown(size = 9))
 
 msci_spain_16_19 <- msci_spain_complete_data %>%
   filter(lubridate::year(date) %in% 2016:2019)
 
 msci_spain_17_20 <- msci_spain_complete_data %>%
   filter(lubridate::year(date) %in% 2017:2020)
+msci_spain_20_21 <- msci_spain_complete_data %>%
+  filter(date > as.Date("2020-04-01") & date < as.Date("2021-10-14"))
 
 save(msci_spain_complete_data, msci_spain_16_19, msci_spain_17_20,
+     msci_spain_20_21,
      file = "data/msci_spain_data_clean.RData")
 
