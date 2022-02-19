@@ -29,8 +29,8 @@ weights_values <- c(
 
 
 # choose the parallel strategy
-future::plan(list(future::tweak(future::multicore, workers = 12),
-                  future::tweak(future::multicore, workers = 13)))
+future::plan(list(future::tweak(future::multicore, workers = 6),
+                 future::tweak(future::multicore, workers = 8)))
 
 
 # for now fix the lengths of the marginal window to 50, of the vine window to 25
@@ -40,25 +40,37 @@ future::plan(list(future::tweak(future::multicore, workers = 12),
 
 # conditioning on the sp500
 cond_risk_roll_16_19_sp500 <- estimate_risk_roll(
-  data = msci_spain_16_19[, 3:12],
-  weights = c(weights_values, "sp500" = 0),
-  marginal_settings = marginal_settings(
-    train_size = 750,
-    refit_size = 50
-  ),
-  vine_settings = vine_settings(
-    train_size = 250,
-    refit_size = 25,
-    family_set = "parametric",
-    vine_type = "dvine"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000,
-  cond_vars = "sp500",
-  cond_u = seq(0.1, 0.9, 0.1)
+ data = msci_spain_16_19[, 3:12],
+ weights = c(weights_values, "sp500" = 0),
+ marginal_settings = marginal_settings(
+   train_size = 750,
+   refit_size = 50
+ ),
+ vine_settings = vine_settings(
+   train_size = 250,
+   refit_size = 25,
+   family_set = "parametric",
+   vine_type = "dvine"
+ ),
+ alpha = alpha_values,
+ risk_measures = risk_measure_values,
+ n_samples = 100000,
+ n_mc_samples = 10000,
+ cond_vars = "sp500",
+ cond_u = seq(0.1, 0.9, 0.1)
 )
+cond_risk_roll_16_19_sp500@time_taken
+
+future::plan("sequential")
+
+save(
+ cond_risk_roll_16_19_sp500,
+ file = "msci_spain_cond1_1619sp500.RData"
+)
+
+# choose the parallel strategy
+future::plan(list(future::tweak(future::multicore, workers = 6),
+                  future::tweak(future::multicore, workers = 8)))
 
 # conditioning on the eurostoxx50 index
 cond_risk_roll_16_19_eurostoxx50 <- estimate_risk_roll(
@@ -86,9 +98,8 @@ cond_risk_roll_16_19_eurostoxx50 <- estimate_risk_roll(
 future::plan("sequential")
 
 save(
-  cond_risk_roll_16_19_sp500,
   cond_risk_roll_16_19_eurostoxx50,
-  file = "msci_spain_cond1_1619.RData"
+  file = "msci_spain_cond1_1619euro.RData"
 )
 
 

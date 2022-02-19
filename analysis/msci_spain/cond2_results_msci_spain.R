@@ -31,29 +31,38 @@ weights_values <- c(
 
 
 # choose the parallel strategy
-future::plan(list(future::tweak(future::multicore, workers = 12),
-                  future::tweak(future::multicore, workers = 13)))
+future::plan(list(future::tweak(future::multicore, workers = 6),
+                 future::tweak(future::multicore, workers = 8)))
 
 cond2_risk_roll_16_19 <- estimate_risk_roll(
-  data = msci_spain_16_19[, 3:13],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 750,
-    refit_size = 50
-  ),
-  vine_settings = vine_settings(
-    train_size = 250,
-    refit_size = 25,
-    family_set = "parametric",
-    vine_type = "dvine"
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000,
-  cond_vars = c("eurostoxx50", "sp500"),
-  cond_u = seq(0.1, 0.9, 0.1)
+ data = msci_spain_16_19[, 3:13],
+ weights = weights_values,
+ marginal_settings = marginal_settings(
+   train_size = 750,
+   refit_size = 50
+ ),
+ vine_settings = vine_settings(
+   train_size = 250,
+   refit_size = 25,
+   family_set = "parametric",
+   vine_type = "dvine"
+ ),
+ alpha = alpha_values,
+ risk_measures = risk_measure_values,
+ n_samples = 100000,
+ n_mc_samples = 10000,
+ cond_vars = c("eurostoxx50", "sp500"),
+ cond_u = seq(0.1, 0.9, 0.1)
 )
+future::plan("sequential")
+
+save(
+ cond2_risk_roll_16_19,
+ file = "msci_spain_cond2_res16.RData"
+)
+
+future::plan(list(future::tweak(future::multicore, workers = 6),
+                  future::tweak(future::multicore, workers = 8)))
 
 cond2_risk_roll_20_21 <- estimate_risk_roll(
   data = msci_spain_20_21[, 3:13],
@@ -80,7 +89,6 @@ cond2_risk_roll_20_21 <- estimate_risk_roll(
 future::plan("sequential")
 
 save(
-  cond2_risk_roll_16_19,
   cond2_risk_roll_20_21,
-  file = "msci_spain_cond2_res.RData"
+  file = "msci_spain_cond2_res20.RData"
 )
