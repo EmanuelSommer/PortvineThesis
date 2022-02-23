@@ -1006,14 +1006,240 @@ Again the same patterns as before are visible.
 
 ### The conditional risk measure estimates
 
-visualize them
-have a look at which level they fail the traditional backtests
-traditional backtest the prior residual risk measure and maybe compare with unconditional
+Now it is of course interesting to visualize not only the conditional values but the actual conditional risk measures. One will thereby focus on the Expected Shortfall at the level 2.5%.
+
+As before one starts with the first time frame and the conditioning on the SP500 index.
+
+
+```{r cond1_rm_sp500_16_quantiles}
+risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
+```
+
+As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. Now the risk measures based on the prior residuals.
+
+```{r cond1_rm_sp500_16_priorresid}
+risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Prior residual based conditional Expected Shortfall",
+       col = "Quantile level",
+       x = "estimation window", y = "portfolio log returns",
+       subtitle = paste0("The conditional
+                         Expected Shortfall at level 2.5% is drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".<br>Conditional variable: SP500"))
+```
+
+The risk estimation looks quite good one could at this point facilitate a traditional backtest and then also a adequately chosen comparative backtest with the unconditional approach.
+
+```{r}
+get_traditional_backtests_cond(cond_risk_roll_16_19_sp500,
+                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
+  mutate(across(starts_with("alpha"), round, digits = 4))
+```
+
+These risk measures actually perform quite good and pass all traditional backtests, as the influence of the conditional variable is almost not there one expects the results of this conditional approach to be similar to the unconditional one. But as one opposes certain additional constraints like the position of the market index in the D-vine and the D-vine itself one might expect to see the unconditional model to be more flexible and therefore better in this situation. Thus one can move on to the comparative backtest.
+
+```{r}
+es_cond_comparative_backtest(
+  cond_risk_roll_16_19_sp500,
+  uncond_risk_roll_16_19_g50_k25_p250,
+  0.025,
+  "prior_resid"
+)
+```
+
+Again one can not make a definitive decision at the 5% significance level but the result clearly indicates a better model fit for the unconditional one.
+
+Next up is the much more influential market index Eurostoxx 50.
+
+```{r cond1_rm_euro_16_quantiles}
+risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
+```
+
+Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures.
+
+Now the risk measures based on the prior residuals.
+
+```{r cond1_rm_euro_16_priorresid}
+risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Prior residual based conditional Expected Shortfall",
+       col = "Quantile level",
+       x = "estimation window", y = "portfolio log returns",
+       subtitle = paste0("The conditional
+                         Expected Shortfall at level 2.5% is drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".<br>Conditional variable: Eurostoxx 50"))
+```
+
+At the first glance this additional conditional variable seems to be very close to the actual realized portfolio returns which might be highly desirable. Yet a look at the traditional backtests might uncover that the risk measures are too close to the realized returns. Moreover in this setting a comparative backtest is not fair as the `prior_resid` strategy uses for the simulation the data from the prior day while the unconditional model does only use forecasted quantities for a whole marginal window.
+
+```{r}
+get_traditional_backtests_cond(cond_risk_roll_16_19_eurostoxx50,
+                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
+  mutate(across(starts_with("alpha"), round, digits = 4))
+```
+
+As expected from the plot the risk measures are not at all conservative enough and thus fail all traditional backtests.
+
+Next one has a look at the second time frame. The conditional index SP500 is again the first one to be analysed.
+
+```{r cond1_rm_sp500_20_quantiles}
+risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window (2021)", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
+```
+
+```{r cond1_rm_sp500_20_priorresid}
+risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Prior residual based conditional Expected Shortfall",
+       col = "Quantile level",
+       x = "estimation window (2021)", y = "portfolio log returns",
+       subtitle = paste0("The conditional
+                         Expected Shortfall at level 2.5% is drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".<br>Conditional variable: SP500"))
+```
+
+Again here probably due to the low influence of the SP500 the risk measure is quite similar to the unconditional one. This is also backed by the results of the traditional backtests that even indicate a quite conservative estimation as some two sided hypotheses have to be rejected because of the conservative nature. At the 1%  level there where no VaR exceedances thus the exceedance residual backtest could not even be tested.
+
+```{r}
+get_traditional_backtests_cond(cond_risk_roll_20_21_sp500,
+                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
+  mutate(across(starts_with("alpha"), round, digits = 4))
+```
+
+```{r cond1_rm_euro_20_quantiles}
+risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window (2021)", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
+```
+
+```{r cond1_rm_euro_20_priorresid}
+risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Prior residual based conditional Expected Shortfall",
+       col = "Quantile level",
+       x = "estimation window (2021)", y = "portfolio log returns",
+       subtitle = paste0("The conditional
+                         Expected Shortfall at level 2.5% is drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".<br>Conditional variable: Eurostoxx 50"))
+```
+
+Again to many violations can be seen here and the exaggeration of drops is clearly visible here. This is also reflected in the results of the traditional backtests below where only 1 of them is slightly passed.
+
+```{r}
+get_traditional_backtests_cond(cond_risk_roll_20_21_eurostoxx50,
+                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
+  mutate(across(starts_with("alpha"), round, digits = 4))
+```
+
+
+
+
+have a look at which quantile level they fail the traditional backtests
+maybe see at which quantile level the comparative backtest is better than the unconditional one
 
 
 ## Double conditional risk measure estimation
 
-
+a look at the dvines
+a look at the conditional risk measures
+maybe again heatmap for failing traditional backtests
 
 
 

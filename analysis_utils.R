@@ -3,7 +3,13 @@
 # package (Mainly visualizations)
 ###############################################################################
 
-
+# -----------------------------------------------------------------------------
+# NOTE: these functions are not intended for the general usage they do not cover
+# input checks, unit tests and are documented quite minimal. If you would like
+# to use these functions do this with care. Some of the visualization functions
+# can be found in a cleaner setup in the Get Started vignette of the portvine
+# package
+# -----------------------------------------------------------------------------
 
 # Extract for each asset the residuals of a certain marginal roll and visualize
 # Returns named list with visualization for each asset
@@ -66,7 +72,7 @@ marg_resid_viz_list <- function(roll, asset_names = NULL, marg_window = 1,
     }, USE.NAMES = TRUE, simplify = FALSE)
 }
 
-# creates a heatmap of Ljung Box test pvalues for a portvineroll object
+# creates a heatmap of Ljung Box test pvalues for a portvine_roll object
 ljung_heatmap <- function(roll, roll_num = 1) {
   asset_names <- fitted_vines(roll)[[1]]$names
   roll_marginals <- fitted_marginals(roll)
@@ -172,7 +178,11 @@ bicops_used <- function(vine) {
 
 
 
+# -----------------------------------------------------------------------------
 # backtesting utilities
+# -----------------------------------------------------------------------------
+
+# traditional backtests for a portvine_roll object
 get_traditional_backtests_uncond <- function(roll, alphas) {
   res <- tribble(
     ~"Risk measure", ~"Backtest",
@@ -261,9 +271,98 @@ get_traditional_backtests_uncond <- function(roll, alphas) {
   }
   res
 }
+# the corresponding version dealing with cond_portvine_roll objects
+get_traditional_backtests_cond <- function(roll, alphas, cond_u) {
+  res <- tribble(
+    ~"Risk measure", ~"Backtest",
+    "VaR", "unconditional coverage",
+    "VaR", "conditional coverage",
+    "ES", "exceedance residuals (two sided)",
+    "ES", "exceedance residuals (one sided)",
+    "ES", "simple conditional calibration (two sided)",
+    "ES", "simple conditional super-calibration (one sided)",
+    "ES", "strict ESR test (two sided)",
+    "ES", "one sided intercept ESR test",
+  )
+  for (alpha in alphas) {
+    res_vec <- numeric(8)
+    ### VaR
+    temp <- rugarch::VaRTest(
+      alpha = alpha,
+      actual = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(realized),
+      VaR = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(risk_est)
+    )[c("uc.LRp", "cc.LRp")]
+    res_vec[1] <- temp[[1]]
+    res_vec[2] <- temp[[2]]
+    ### ES
+    # exceedance residuals
+    temp <- esback::er_backtest(
+      r = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(realized),
+      q = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(risk_est),
+      e = risk_estimates(roll, "ES_mean", alpha, cond_u = cond_u) %>%
+        pull(risk_est)
+    )
+    res_vec[3] <- temp$pvalue_twosided_simple
+    res_vec[4] <- temp$pvalue_onesided_simple
+    # conditional calibration
+    temp <- esback::cc_backtest(
+      r = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(realized),
+      q = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+        pull(risk_est),
+      e = risk_estimates(roll, "ES_mean", alpha, cond_u = cond_u) %>%
+        pull(risk_est),
+      alpha = alpha
+    )
+    res_vec[5] <- temp$pvalue_twosided_simple
+    res_vec[6] <- temp$pvalue_onesided_simple
+    # ESR tests
+    temp <- try(
+      esback::esr_backtest(
+        r = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+          pull(realized),
+        q = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+          pull(risk_est),
+        e = risk_estimates(roll, "ES_mean", alpha, cond_u = cond_u) %>%
+          pull(risk_est),
+        alpha = alpha,
+        version = 1
+      ), silent = TRUE)
+    if ("try-error" %in% class(temp)) {
+      res_vec[7] <- -1
+    } else {
+      res_vec[7] <- temp$pvalue_twosided_asymptotic
+    }
 
-# comparative backtesting as in Nolde and Ziegel 2017
+    temp <- try(
+      esback::esr_backtest(
+        r = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+          pull(realized),
+        q = risk_estimates(roll, "VaR", alpha, cond_u = cond_u) %>%
+          pull(risk_est),
+        e = risk_estimates(roll, "ES_mean", alpha, cond_u = cond_u) %>%
+          pull(risk_est),
+        alpha = alpha,
+        version = 3
+      ), silent = TRUE)
+    if ("try-error" %in% class(temp)) {
+      res_vec[8] <- -1
+    } else {
+      res_vec[8] <- temp$pvalue_onesided_asymptotic
+    }
+    res <- res %>%
+      bind_cols("temp" = res_vec) %>%
+      rename(!!paste("alpha:", alpha) := temp)
+  }
+  res
+}
 
+### comparative backtesting as in Nolde and Ziegel 2017
+# first up the scoring function for the ES
 es_scoring <- function(realized, es, var, alpha) {
   if (any(es >= 0)) stop("ES must be always negative for this scoring function")
   ((realized < var) * (realized  - var) / es) +
@@ -278,6 +377,38 @@ es_comparative_backtest <- function(roll1, roll2, alpha) {
   var1 <- risk_estimates(roll1, "VaR", alpha) %>%
     pull(risk_est)
   es1 <- risk_estimates(roll1, "ES_mean", alpha) %>%
+    pull(risk_est)
+  scoring1 <- es_scoring(
+    realized = realized1,
+    es = es1,
+    var = var1,
+    alpha = alpha
+  )
+  realized2 <- risk_estimates(roll2, "ES_mean", alpha) %>%
+    pull(realized)
+  var2 <- risk_estimates(roll2, "VaR", alpha) %>%
+    pull(risk_est)
+  es2 <- risk_estimates(roll2, "ES_mean", alpha) %>%
+    pull(risk_est)
+  scoring2 <- es_scoring(
+    realized = realized2,
+    es = es2,
+    var = var2,
+    alpha = alpha
+  )
+  n <- length(realized1)
+  sigma <- sd(scoring1 - scoring2)
+  test_statistic <- mean(scoring1 - scoring2) * sqrt(n) / sigma
+  confidence_result <- pnorm(test_statistic)
+  c(test_statistic = test_statistic, confidence_result = confidence_result)
+}
+# the same but roll1 is a cond_portvine_roll object
+es_cond_comparative_backtest <- function(cond_roll1, roll2, alpha, cond_u) {
+  realized1 <- risk_estimates(cond_roll1, "ES_mean", alpha, cond_u = cond_u) %>%
+    pull(realized)
+  var1 <- risk_estimates(cond_roll1, "VaR", alpha, cond_u = cond_u) %>%
+    pull(risk_est)
+  es1 <- risk_estimates(cond_roll1, "ES_mean", alpha, cond_u = cond_u) %>%
     pull(risk_est)
   scoring1 <- es_scoring(
     realized = realized1,
