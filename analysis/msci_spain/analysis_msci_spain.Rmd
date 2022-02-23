@@ -4,8 +4,10 @@ author: "Emanuel Sommer"
 output: 
   html_document:
     toc: true
+    toc_float: true
     theme: flatly
     df_print: paged
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
@@ -14,7 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this analysis different portfolios consisting of stocks that are among the top 10 constituents of the MSCI Spain Index are backtested using the functionality of the `portvine` package. First the most important packages are loaded and after that the data will be imported and discussed shortly.
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # main workhorse for the estimation of risk measures
 library(portvine)
 # general data wrangling and visualizations
@@ -28,6 +30,7 @@ theme_set(
   theme(plot.title = ggtext::element_markdown(size = 11),
         plot.subtitle = ggtext::element_markdown(size = 9))
 )
+Sys.setlocale("LC_TIME", "English")
 # load the data
 load(here::here("data", "msci_spain_data_clean.RData"))
 # source utils
@@ -36,197 +39,189 @@ source(here::here("analysis_utils.R"))
 
 ## A first glimpse at the data
 
-```{r}
-glimpse(msci_spain_data)
+```{r, cache=TRUE}
+glimpse(msci_spain_complete_data)
 ```
 
-One can see that there are 11 columns. The `date` column gives obviously the date as daily return data will be analyzed here. The daily log returns of the overall index are given in the column `msci_spain_index` and all other columns contain the daily log returns of the respective stock. One can also detect missing values which can be nicely observed in the visualization below.
-
-```{r, echo=FALSE}
-msci_spain_data %>%
-  rowid_to_column("id") %>%
-  pivot_longer(-c(date, id)) %>%
-  mutate(missing = is.na(value)) %>%
-  ggplot() +
-  geom_point(aes(x = date, y = factor(name), col = missing),
-             shape = 15, size = 10) +
-  scale_color_manual(values = custom_colors[1:2]) +
-  scale_y_discrete(labels = ~ str_to_title(str_replace_all(.x, "_", " "))) +
-  guides(col = "none") +
-  labs(x = "", y = "",
-       title = paste("Display asset returns that are ",
-                     "<span style='color:",
-                     custom_colors[1],
-                     "'>**available**</span>",
-                     " or ",
-                     "<span style='color:",
-                     custom_colors[2],
-                     "'>**missing**</span>",
-                     "."))
-  
-```
-
-This makes total sense as for example Cellnex Telecom stocks are traded since 2015, so there can not be earlier return data. So one could now either impute the values in order to use the whole time frame but here the more simplistic approach of just looking at a time frame without any missing values is applied.
-This reduced data set is available as `msci_spain_complete_data` and contains only complete cases. 
+One can see that there are 13 columns. The `date` column gives obviously the date as daily return data will be analyzed here. The daily log returns of the overall index are given in the column `msci_spain_index`, `eurostoxx50` contains the corresponding daily log returns of the Eurostoxx 50 index, `sp500` the daily log return of the SP500 index and all other columns contain the daily log returns of the respective stocks within the MSCI spain. 
 
 ```{r}
 summary(msci_spain_complete_data$date)
 nrow(msci_spain_complete_data)
 ```
 
-This means that the time frame is from the 8th Mai of 2015 until the 8th November of 2021 and there are `r nrow(msci_spain_complete_data)` observations. Below one can have a look at daily log returns of the overall MSCI Spain index.
+This means that the time frame is from the 11th Mai of 2015 until the 8th November of 2021 and there are `r nrow(msci_spain_complete_data)` observations. Below one can have a look at daily log returns of the overall MSCI Spain index.
 
-```{r, echo=FALSE}
+```{r msci_spain_overall, echo=FALSE}
 ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
   geom_line() +
   labs(x = "", y = "Daily log return",
        title = "MSCI Spain index") 
 ```
 
-So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulences, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. This should give the opportunity to access how robust the risk measure estimates are during a crisis. With a training data window size of 1000 one would start estimating risk measures from March 2019 so the high volatility corona situation will be covered.
+So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulence, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. The period with the pandemic in place allows to test the backtesting in a higher volatility setting. Thus one will specify the following two time frames of interest.
+
+1. 01.01.2016 - 31.12.2019, the filtered data is contained in `msci_spain_16_19`
+2. 02.04.2020 - 13.10.2021, the filtered data is contained in `msci_spain_20_21`
+
+As all risk estimations are based on the rather high sample size $S$ of 100000 all risk estimations were performed remotely at the Leibniz supercomputing centre and the results saved. This allows to exploit the nested parallelization provided by the `portvine` package.
+
+## Unconditional risk measure estimation
+
+The portfolio is here given via 9 assets:
+
+* Iberdrola
+* Banco Santander
+* Inditex
+* Cellnex Telecom
+* Repsol
+* Ferrovial
+* Amadeus It Group
+* Telefonica
+* BBV Argentaria
+
+The portfolio is weighted according to their respective market capitalization on the 29.10.2021.
 
 ```{r}
-# first risk estimate date for 1000 as the training window size
-msci_spain_complete_data$date[1001]
+# weights according to the market capitalization on the 29.10.21
+weights_values <- c(
+  iberdrola = 60.48,
+  banco_santander = 56.82,
+  bbv_argentaria = 40.42,
+  inditex = 34.08,
+  cellnex_telecom = 27.09,
+  amadeus_it_group = 26.06,
+  telefonica = 19.37,
+  repsol_ypf = 16.04,
+  ferrovial = 12.99
+)
 ```
 
-Now specify the first portfolio and analyze it unconditionally as well as conditionally.
+One always estimates all available risk measures i.e. VaR and the ES with all three estimation methods (mean, median and monte carlo integration based on 10000 samples). The $\alpha$ levels estimated are 0.01, 0.025, 0.05 and 0.95.
 
+For the marginal models one uses as a default the commonly used ARMA(1,1)-GARCH(1,1) model. If a lack of fit is detected one can adjust this. The training window size for the marginal windows is fixed to 750 days which are roughly 3 financial years in the first time frame and to 300 days in the second time frame. For both time frames the refitting frequency is 50 days which are roughly 2 financial months.
 
-## The missing leader portfolio `missl`
-
-Here one picks as the stock portfolio equally weighted all the stocks without the one with the highest market capitalization that makes roughly 17% of the MSCI Spain i.e. Iberdrola, that is mainly in the energy business. First one models this portfolio and estimates the risk estimates unconditionally and then conditionally on the biggest player Iberdrola. 
-
-### Unconditional `missl` portfolio
-
-First specify suitable marginal model settings as well as settings for the vine copula.
+In the unconditional case one allows for the general class of R-vine copulas and uses all available parametric bivariate building blocks. For the vine training size different specifications will be evaluated. For the first time frame one tries the vine training window lengths of 250 and 500 and for the second one 100 and 200. For both time frames one tries the two refitting frequencies of 25 and 50.
 
 ```{r}
-missl_marginal_settings <- marginal_settings(
-  train_size = 1000,
-  refit_size = 50
-)
-
-missl_vine_settings <- vine_settings(
-  train_size = 200,
-  refit_size = 25,
-  family_set = "all",
-  vine_type = "rvine"
-)
+# load the unconditional models
+load(here::here("data", "msci_spain_uncond_res.RData"))
+load(here::here("data", "msci_spain_uncond_gausst.RData"))
 ```
 
-To compare run times one estimates the risk once sequentially and once in parallel.
+
+Display the summary of two of the models.
 
 ```{r}
-# sequentially
-missl_risk_roll_seq <- estimate_risk_roll(
-  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
-  weights = NULL,
-  marginal_settings = missl_marginal_settings,
-  vine_settings = missl_vine_settings,
-  alpha = c(0.01, 0.05, 0.1),
-  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
-  n_samples = 1000,
-  n_mc_samples = 1000,
-  trace = TRUE
-)
-
-# 4 parallel R session
-future::plan("multisession", workers = 4)
-missl_risk_roll <- estimate_risk_roll(
-  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
-  weights = NULL,
-  marginal_settings = missl_marginal_settings,
-  vine_settings = missl_vine_settings,
-  alpha = c(0.01, 0.05, 0.1),
-  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
-  n_samples = 1000,
-  n_mc_samples = 1000,
-  trace = TRUE
-)
-future::plan("sequential")
+summary(uncond_risk_roll_16_19_g50_k25_p250)
+summary(uncond_risk_roll_20_21_g50_k25_p200)
 ```
 
-The results and their respective run times can be seen below.
+### Assessment of the marginal model fit.
 
-```{r}
-missl_risk_roll_seq
-missl_risk_roll
-# thus the speedup is already for 4 workers
-missl_risk_roll_seq@time_taken / missl_risk_roll@time_taken
-# besides the print method one can also call the summary for more details
-summary(missl_risk_roll)
-```
-
-#### Inspect marginal and vine copula model fits
-
-Now one can use the accessor functions to extract the fitted marginal as well as the vine copula models. But first one has a close look at the marginal models and can assess their model quality.
+As the marginal models are the same for each time frame one has a look at the the respective models. First the time frame from 2016 up to 2019. One only has a look at the model corresponding to the first marginal window which will be done here for simplicity but it might also in practice be a reasonable approach as one then only uses the training data available before starting the rolling window risk estimation.
 
 ```{r, echo=TRUE, results='hide'}
-### get the fitted marginal models
-missl_fitted_marginals <- fitted_marginals(missl_risk_roll)
-# for each asset one now can access the uGARCHroll object that for example 
-# contains the fitted coefficients for the second rolling window 
+marg_viz_uncond_risk_roll_16_19 <- marg_resid_viz_list(
+  uncond_risk_roll_16_19_g50_k25_p250
+)
+marg_viz2_uncond_risk_roll_16_19 <- marg_resid_viz_list(
+  uncond_risk_roll_16_19_g50_k25_p250, squared = TRUE
+)
+```
 
-# For now analyze the residuals (mean equation) and the squared residuals 
-# (volatilitty equation) of every first of each asset.
-missl_resid_plots <- marg_resid_viz_list(missl_risk_roll)
-missl_squaredresid_plots <- marg_resid_viz_list(missl_risk_roll, squared = TRUE)
+```{r residual_plots_16, fig.keep='all'}
+for (asset in names(marg_viz_uncond_risk_roll_16_19)) {
+  print(marg_viz_uncond_risk_roll_16_19[[asset]])
+  print(marg_viz2_uncond_risk_roll_16_19[[asset]])
+}
+```
+
+A more comprehensive yet less informative visualization is achieved via the heatmap below.
+
+```{r heatmap_16}
+ljung_heatmap(uncond_risk_roll_16_19_g50_k25_p250)
+```
+
+The interactive version even allows to see how the marginal models of all the marginal windows behave w.r.t. the Ljung Box test.
+
+```{r anim_heatmap_16}
+ljung_heatmap_animation(uncond_risk_roll_16_19_g50_k25_p250)
+```
+
+Thus it is quite obvious that the default specification of an ARMA(1,1)-GARCH(1,1) model does a good job. The only two questionable marginal models would be Ferrovial and Cellnex. But as the quality breaches only appear beyond the third lag one will for now hold on to the default model.
+
+Next up the second time frame from 02.04.2020 - 13.10.2021.
+
+```{r, echo=TRUE, results='hide'}
+marg_viz_uncond_risk_roll_20_21 <- marg_resid_viz_list(
+  uncond_risk_roll_20_21_g50_k25_p200
+)
+marg_viz2_uncond_risk_roll_20_21 <- marg_resid_viz_list(
+  uncond_risk_roll_20_21_g50_k25_p200, squared = TRUE
+)
+```
+
+```{r residual_plots_20, fig.keep='all'}
+for (asset in names(marg_viz_uncond_risk_roll_20_21)) {
+  print(marg_viz_uncond_risk_roll_20_21[[asset]])
+  print(marg_viz2_uncond_risk_roll_20_21[[asset]])
+}
+```
+
+A more comprehensive yet less informative visualization is again achieved via the heatmap below.
+
+```{r heatmap_20}
+ljung_heatmap(uncond_risk_roll_20_21_g50_k25_p200)
+```
+
+The interactive version again allows to see how the marginal models of all the marginal windows behave w.r.t. the Ljung Box test.
+
+```{r anim_heatmap_20}
+ljung_heatmap_animation(uncond_risk_roll_20_21_g50_k25_p200)
+```
+
+Here the fit of Banco Santander is the most questionable but as it is a short call one will first stick to the default model for all marginal models.
+
+### A look at the R-vines
+
+Next up one can analyze the fitted R-vines. The most interesting questions that arise in this context are which bivariate building blocks were fitted and how strong their dependence is. Also it might be interesting to detect changing patterns over time. Again one starts with the first time frame.
+
+```{r rvine_16, fig.width=12, fig.height=8}
+labeled_vinecop_plot(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[1]])
+labeled_vinecop_plot(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[6]])
+labeled_vinecop_plot(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[12]])
 ```
 
 ```{r}
-# exemplary 2 plots, all plots showed basically the same behavior like the ones
-# below
-missl_resid_plots$telefonica
-missl_squaredresid_plots$telefonica
-missl_resid_plots$repsol_ypf
-missl_squaredresid_plots$repsol_ypf
+bicops_used(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[1]])
+bicops_used(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[6]])
+bicops_used(fitted_vines(uncond_risk_roll_16_19_g50_k25_p250)[[12]])
 ```
 
+So there is definitely a change over time visible as well as the use of non Student's t/Gaussian components. The same analysis can be performed on the second time frame.
 
-
-
+```{r rvine_20, fig.width=12, fig.height=8}
+labeled_vinecop_plot(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[1]])
+labeled_vinecop_plot(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[4]])
+```
 
 ```{r}
-# all assets simultainiously
-ljung_heatmap(missl_risk_roll)
-ljung_heatmap(missl_risk_roll, 3)
-
-# an animation over all marginal windows:
-ljung_heatmap_animation(missl_risk_roll)
+bicops_used(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[1]])
+bicops_used(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[4]])
 ```
 
+It is obvious that in this high volatility time frame the use of extreme value copulas is much higher than in the previous time frame. Again the Banco Santander assets seems to have a central role in this portfolio.
+
+### Expected Shortfall estimators
+
+As the package presents three different risk measure estimators namely the mean, median and monte carlo integration estimation it is reasonable to compare the estimated risk measures for the two time frames.
+
+For the first time frame this looks as follows.
 
 
-So overall the marginal models seem to satisfy the model assumptions. Notably there were many cases with a heavier lower tail which can be explained by the high volatility corona crisis. As already the skewed student's t distribution was chosen for the residual distribution one already accounts for heavy tails.
-
-Now one can have a look at the fitted vine copulas. Again there is an appropriate accessor function that helps with extracting them. After that one can visually inspect how the first tree of the vines has changed over time.
-
-```{r}
-### get the fitted vine copula models
-missl_fitted_vines <- fitted_vines(missl_risk_roll)
-# then one can for example have a look at how the fitted vine structure evolved
-#  over time by plotting the first tree for different rolling windows
-
-labeled_vinecop_plot(missl_fitted_vines[[1]])
-bicops_used(missl_fitted_vines[[1]])
-
-labeled_vinecop_plot(missl_fitted_vines[[14]])
-bicops_used(missl_fitted_vines[[14]])
-
-labeled_vinecop_plot(missl_fitted_vines[[28]])
-bicops_used(missl_fitted_vines[[28]])
-```
-
-The first two assets seem to be very important in their dependence structure.
-
-
-#### Analyze estimated risk measures
-
-Now finally the risk estimates are going to be analyzed. First one compares the 3 different methods of estimating the Expected Shortfall.
-
-```{r, echo=FALSE}
-risk_estimates(missl_risk_roll,
+```{r es_estimators_16, echo=FALSE}
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("ES_mean", "ES_median", "ES_mc"),
                alpha = 0.05) %>%
   pivot_wider(names_from = risk_measure, values_from = risk_est) %>%
@@ -246,7 +241,7 @@ risk_estimates(missl_risk_roll,
 Also one might compare the number of exceedances.
 
 ```{r}
-risk_estimates(missl_risk_roll,
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("ES_mean", "ES_median", "ES_mc"),
                alpha = 0.05,
                exceeded = TRUE) %>%
@@ -254,37 +249,165 @@ risk_estimates(missl_risk_roll,
   summarise(relative_exceedances = mean(exceeded))
 ```
 
-Here actually we find an indication for the fact that the values that fell below the corresponding VaR where left skewed which leads to the fact that the mean will be a more conservative estimate in those cases which might explain the slightly lower exceedance rate.
+Thus the differences in the estimation are minimal. Here actually we find an indication for the fact that the values that fell below the corresponding VaR where left skewed which leads to the fact that the mean will be a more conservative estimate in those cases which might explain the slightly lower exceedance rate. One can also look at the same comparisons for the second time frame.
 
-### Exceedance plots
+```{r es_estimators_20, echo=FALSE}
+risk_estimates(uncond_risk_roll_20_21_g50_k25_p200,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05) %>%
+  pivot_wider(names_from = risk_measure, values_from = risk_est) %>%
+  plotly::plot_ly(x = ~ES_mean, y = ~ES_median, z = ~ES_mc,
+                  marker = list(symbol = 'circle', color = "black",
+                                size = 2),
+                  text = ~ paste('Row:', row_num)) %>%
+  plotly::add_markers(opacity = 0.2) %>%
+  plotly::layout(
+    scene = list(xaxis = list(title = 'Mean'),
+                 yaxis = list(title = 'Median'),
+                 zaxis = list(title = 'Monte Carlo')),
+    title = "Empirical comparison of Expected Shortfall estimatiors"
+  )
+```
 
-```{r, echo=TRUE}
-risk_estimates(missl_risk_roll,
+Also one might compare the number of exceedances.
+
+```{r}
+risk_estimates(uncond_risk_roll_20_21_g50_k25_p200,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05,
+               exceeded = TRUE) %>%
+  group_by(risk_measure) %>%
+  summarise(relative_exceedances = mean(exceeded))
+```
+
+The same patterns as above are visible. Thus one will stick to the mean estimation approach in the rest of the analysis.
+
+### Backtesting the risk measures
+
+#### Traditional Backtests
+
+Now the first time frame 2016-19
+
+```{r}
+get_traditional_backtests_uncond(
+  uncond_risk_roll_16_19_g50_k25_p250,
+  alphas = c(0.01, 0.025, 0.05)) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_16_19_g50_k50_p250,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_16_19_g50_k25_p500,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_16_19_g50_k50_p500,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  mutate("vine training length" = rep(c(250, 500), each = 16),
+         "vine window size" = rep(rep(c(25, 50), each = 8), 2))
+  
+```
+
+
+All p-values are above the common confidence value 5% s.t. the traditional backtests all pass. In some cases i.e. alpha level 0.01 due to limitations of the `esback` package one has -1 as the replacement when the backtest could not be performed. The closest decisions were the unconditional coverage test at the alpha level 2.5% with vine training length of 250 and window size 50 and the one sided exceedance residual test at the level 5% with vine training length 500 and window size 50. Now display the results of the traditional backtests for the second time frame.
+
+```{r}
+get_traditional_backtests_uncond(
+  uncond_risk_roll_20_21_g50_k25_p100,
+  alphas = c(0.01, 0.025, 0.05)) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_20_21_g50_k25_p200,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_20_21_g50_k50_p100,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  bind_rows(
+    get_traditional_backtests_uncond(
+      uncond_risk_roll_20_21_g50_k50_p200,
+      alphas = c(0.01, 0.025, 0.05)
+    )
+  ) %>%
+  mutate("vine training length" = rep(c(100, 200), each = 16),
+         "vine window size" = rep(rep(c(25, 50), each = 8), 2))
+  
+```
+
+Again looks good besides some too conservative estimates at the lowest alpha level where the one sided is highly significant and the two sided not. This means that one is probably too conservative in this case. Depending on the user of the backtest this might even be more desirable.
+
+#### Visualize the unconditional risk measures
+
+Visual comparison of the VaR and ES for one risk roll specification of the first time frame.
+
+```{r risk_comparison_es_var_16}
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("ES_mean", "VaR"),
                alpha = 0.01) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est,
+  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = risk_est,
                 col = risk_measure, linetype = risk_measure),
             size = 0.5) +
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Risk measure",
        title = "Comparison of risk measure behaivior for alpha level 0.01") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
-                     name = "Risk measure") +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+                     name = "Risk measure") 
 ```
 
-```{r}
-risk_estimates(missl_risk_roll,
+As always now the second time frame.
+
+```{r risk_comparison_es_var_20}
+risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = risk_est,
+                col = risk_measure, linetype = risk_measure),
+            size = 0.5) +
+  labs(x = "estimation window (2021)", y = "portfolio log returns",
+       linetype = "Risk measure",
+       title = "Comparison of risk measure behaivior for alpha level 0.01") +
+  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
+                     name = "Risk measure") 
+```
+
+These plots also suggest empirically that the assumption of colinearity of the ES and VaR that is used in the ESR backtesting seems reasonable.
+
+Now some exemplary **exceedance plots**.
+
+```{r var_exceedance_uncond}
+# first time frame
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("VaR"),
                alpha = 0.01,
                exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
+  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
@@ -296,21 +419,22 @@ risk_estimates(missl_risk_roll,
                      "."),
        title = "Risk measure: VaR with alpha level 0.01"
        ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
+  theme(legend.position = "none")
 
-risk_estimates(missl_risk_roll,
-               risk_measures = c("ES_mean"),
+# second time frame
+risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
+               risk_measures = c("VaR"),
                alpha = 0.01,
                exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
+  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1]) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window",
+  labs(x = "estimation window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances are highlighted in ",
@@ -318,209 +442,427 @@ risk_estimates(missl_risk_roll,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES (mean estimation) with alpha level 0.01"
+       title = "Risk measure: VaR with alpha level 0.01"
        ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
+  theme(legend.position = "none")
 ```
 
-### Backtesting
+For the visualization of the ES it is reasonable to not mark the exceedances of the ES but again the ones of the corresponding VaR which is more natural given the definition of the ES. An example is given below.
 
-#### Backtesting Expected Shortfall
-
-Use the `esback` package for backtesting.
-
-```{r}
-# use the esback package for ES backtesting
-esback::er_backtest(
-  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(realized),
-  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(risk_est),
-  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "ES_mean") %>%
-    pull(risk_est)
-)[1:2]
-esback::cc_backtest(
-  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(realized),
-  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(risk_est),
-  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "ES_mean") %>%
-    pull(risk_est),
-  alpha = 0.05
-)[1:2]
-esback::esr_backtest(
-  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(realized),
-  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(risk_est),
-  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "ES_mean") %>%
-    pull(risk_est),
-  alpha = 0.05,
-  version = 2,
-  B = 100
-)
-esback::esr_backtest(
-  r = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(realized),
-  q = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "VaR") %>%
-    pull(risk_est),
-  e = risk_estimates(missl_risk_roll, alpha = 0.05) %>%
-    filter(risk_measure == "ES_mean") %>%
-    pull(risk_est),
-  alpha = 0.05,
-  version = 1,
-  B = 100
-)
-# visualize the exceedance residuals tested with er_backtest
-risk_estimates(missl_risk_roll, alpha = 0.05, exceeded = TRUE) %>%
-  inner_join(risk_estimates(missl_risk_roll, alpha = 0.05, exceeded = TRUE) %>%
-               filter(exceeded & risk_measure == "VaR") %>%
-               select(row_num),
-             by = "row_num") %>%
-  filter(risk_measure %in% c("ES_mean")) %>%
-  mutate(exceed_resid = realized - risk_est) %>%
-  ggplot(aes(x = exceed_resid)) + 
-  geom_histogram(bins = 40, alpha = 0.3) +
-  labs(x = "Exceedance residuals") +
-  geom_density() +
-  geom_vline(aes(xintercept = mean(exceed_resid)), col = custom_colors[1],
-             size = 1)
+```{r es_exceedance_16}
+# first time frame
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES with alpha level 0.01"
+       ) +
+  theme(legend.position = "none")
 ```
 
 
-Also fit the unconditional `missl` portfolio with only D vine copulas allowed to compare these D vines with the then conditional ones.
+#### Comparative Backtests
+
+The traditional backtests do not allow for a  comparison thus one facilitates the comparative backtest by Nolde and Ziegel (2017) based on scoring functions in order to compare the models.
 
 ```{r}
-missl_vine_settings_d <- vine_settings(
-  train_size = 200,
-  refit_size = 25,
-  family_set = "all",
-  vine_type = "dvine"
+# the resulting matrix gives the following interpretation
+# if the value is less than say nu = 5% then one would argue with the corresponding
+# confidence of 95% that the model corresponding to the row performs at least
+# as good as the one corresponding to the row. For values between nu and 1-nu
+# one can not make a definitive decision but indications are yet visible.
+# This three zone approach is the one of Nolde and Ziegel 2017
+comparative_backtesting_matrix <- function(roll_list, alpha) {
+  n_rolls <- length(roll_list)
+  res <- matrix(rep(NA_real_, n_rolls^2), nrow = n_rolls)
+  for (i in seq(n_rolls)) {
+    for (j in seq(n_rolls)) {
+      if (i != j) {
+        res[i, j] <- es_comparative_backtest(
+          roll1 = roll_list[[i]],
+          roll2 = roll_list[[j]],
+          alpha = alpha
+        )[2]
+      }
+    }
+  }
+  colnames(res) <- names(roll_list)
+  rownames(res) <- names(roll_list)
+  res
+}
+comparative_backtesting_matrix(
+  list(
+    k25_p250 = uncond_risk_roll_16_19_g50_k25_p250,
+    k25_p500 = uncond_risk_roll_16_19_g50_k25_p500,
+    k50_p250 = uncond_risk_roll_16_19_g50_k50_p250,
+    k50_p500 = uncond_risk_roll_16_19_g50_k50_p500
+  ),
+  alpha = 0.01
 )
-future::plan("multisession", workers = 6)
-missl_risk_roll_d <- estimate_risk_roll(
-  msci_spain_complete_data %>% select(-c(date, msci_spain_index, iberdrola)),
-  weights = NULL,
-  marginal_settings = missl_marginal_settings,
-  vine_settings = missl_vine_settings_d,
-  alpha = c(0.01, 0.05, 0.1),
-  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
-  n_samples = 1000,
-  n_mc_samples = 1000,
-  trace = TRUE
+```
+Again one first has a look at the first time frame. Here no definite decisions are possible. The results however provide some indications. For example the longer vine training window size of 500 seems to be slightly better than the shorter training window size. Moreover the smaller vine window of 25 does not seem to be necessary. The window size of 50 might even be in cases superior. So overall from the indications one would probably opt for the model with vine training size of 500 and refit size 50.
+
+In this setting one has also estimated the risk measures with only Gaussian and Student's t components (now referred to as a t-vine). Thus a comparison would be very interesting.
+
+```{r}
+comparative_backtesting_matrix(
+  list(
+    all = uncond_risk_roll_16_19_g50_k50_p250,
+    gaussian_t = uncond_risk_roll_16_19_t
+  ),
+  alpha = 0.01
 )
-future::plan("sequential")
+```
+
+There is a slight tendency towards the t-vine model. One can have a look at the respective risk measures visually.
+
+```{r es_comparison_tvine_16}
+(
+risk_estimates(uncond_risk_roll_16_19_g50_k50_p250,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES with alpha level 0.01, all parametric copula families"
+       ) +
+  theme(legend.position = "none")
+) / (
+risk_estimates(uncond_risk_roll_16_19_t,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES with alpha level 0.01, only Gaussian and Student's t copulas"
+       ) +
+  theme(legend.position = "none")
+)
+```
+
+The difference is also visually quite small. One can just see a slightly more conservative risk measure for the t-vine model.
+
+Next up the second time frame.
+
+```{r}
+comparative_backtesting_matrix(
+  list(
+    k25_p100 = uncond_risk_roll_20_21_g50_k25_p100,
+    k25_p200 = uncond_risk_roll_20_21_g50_k25_p200,
+    k50_p100 = uncond_risk_roll_20_21_g50_k50_p100,
+    k50_p200 = uncond_risk_roll_20_21_g50_k50_p200
+  ),
+  alpha = 0.01
+)
+```
+
+Here as above a tendency towards the bigger vine training window size is visible. No definitive answer can be given however. There is no clear indication whether the shorter or bigger vine rolling window of 25 or 50 performs better. From these indications one would probably opt for the model with vine training size 200 and refit size 50.
+
+Again for the comparison a t-vine model was fitted.
+
+
+```{r}
+comparative_backtesting_matrix(
+  list(
+    all = uncond_risk_roll_20_21_g50_k50_p200,
+    gaussian_t = uncond_risk_roll_20_21_t
+  ),
+  alpha = 0.01
+)
+```
+
+Contrary to the setting in the first time frame one can observe that here there is an indication visible that the general R-vine model does perform better. The decision is however not definitive. Once again a visual inspection is reasonable.
+
+```{r es_comparison_tvine_20}
+(
+risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window (2021)",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES with alpha level 0.01, all parametric copula families"
+       ) +
+  theme(legend.position = "none")
+) / (
+risk_estimates(uncond_risk_roll_20_21_t,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.01,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window (2021)",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     "."),
+       title = "Risk measure: ES with alpha level 0.01, only Gaussian and Student's t copulas"
+       ) +
+  theme(legend.position = "none")
+)
+```
+
+The only considerable difference is that the risk estimates corresponding to the R-vine model are slightly more conservative which might be desirable in a high volatility situation like the ongoing pandemic in 2021.
+
+
+All in all one can conclude that in both time frames the unconditional risk measure estimation approach worked really well as on all tested confidence levels all traditional backtests passed.
+
+## Single conditional risk measure estimation
+
+Here one uses the same base portfolio as in the unconditional case but introduces a conditioning variable. One will have a look at the influence of two conditioning market indices namely the **SP500** and the **Eurostoxx50** indices. They represent the overall American and European market trend.
+
+```{r}
+# load the single conditional models
+load(here::here("data", "msci_spain_cond1_1619euro.RData"))
+load(here::here("data", "msci_spain_cond1_1619sp500.RData"))
+load(here::here("data", "msci_spain_cond1_2021.RData"))
+```
+
+Look at the fitted models for the first time frame.
+
+```{r}
+summary(cond_risk_roll_16_19_sp500)
+summary(cond_risk_roll_16_19_eurostoxx50)
+```
+
+And the second time frame.
+
+```{r}
+summary(cond_risk_roll_20_21_sp500)
+summary(cond_risk_roll_20_21_eurostoxx50)
+```
+
+### Assessment of the marginal models
+
+Here actually one only has to check whether the index is well fitted. The marginal models for the portfolio do not change.
+
+```{r, echo=TRUE, results='hide'}
+marg_viz_cond_risk_roll_16_19sp500 <- marg_resid_viz_list(
+  cond_risk_roll_16_19_sp500
+)
+marg_viz2_cond_risk_roll_16_19sp500 <- marg_resid_viz_list(
+  cond_risk_roll_16_19_sp500, squared = TRUE
+)
+
+marg_viz_cond_risk_roll_16_19euro <- marg_resid_viz_list(
+  cond_risk_roll_16_19_eurostoxx50
+)
+marg_viz2_cond_risk_roll_16_19euro <- marg_resid_viz_list(
+  cond_risk_roll_16_19_eurostoxx50, squared = TRUE
+)
+
+marg_viz_cond_risk_roll_20_21sp500 <- marg_resid_viz_list(
+  cond_risk_roll_20_21_sp500
+)
+marg_viz2_cond_risk_roll_20_21sp500 <- marg_resid_viz_list(
+  cond_risk_roll_20_21_sp500, squared = TRUE
+)
+
+marg_viz_cond_risk_roll_20_21euro <- marg_resid_viz_list(
+  cond_risk_roll_20_21_eurostoxx50
+)
+marg_viz2_cond_risk_roll_20_21euro <- marg_resid_viz_list(
+  cond_risk_roll_20_21_eurostoxx50, squared = TRUE
+)
+```
+
+The residual analysis for the conditional variables regarding the first time frame suggest a good fit of the ARMA(1,1)-GARCH(1,1) model as evident below.
+
+```{r residual_plots_cond1_16}
+marg_viz_cond_risk_roll_16_19sp500$sp500
+marg_viz2_cond_risk_roll_16_19sp500$sp500
+marg_viz_cond_risk_roll_16_19euro$eurostoxx50
+marg_viz2_cond_risk_roll_16_19euro$eurostoxx50
+```
+
+For the second time frame one can observe a very close call for the mean equation of the marginal model for the conditional variable SP500. As the decision is very close one will not adjust the model in this case.
+
+```{r residual_plots_cond1_20}
+marg_viz_cond_risk_roll_20_21sp500$sp500
+marg_viz2_cond_risk_roll_20_21sp500$sp500
+marg_viz_cond_risk_roll_20_21euro$eurostoxx50
+marg_viz2_cond_risk_roll_20_21euro$eurostoxx50
+```
+
+### A look at the D-vines
+
+Here one uses D-vines with the fixed position of the index at the rightmost leaf. One can have a look whether the ordering changes over time and which asset seems to be most influenced by the market index. Again also the fitted bivariate copulas are of interest.
+
+One starts with the first time frame and the SP500 index.
+
+```{r dvines_cond1_16sp500, fig.width=14, fig.height=8}
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[6]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[12]])
 ```
 
 
-### Conditional `missl` portfolio
-
-Estimation is performed in the same fashion as above with some additional arguments concerning the conditioning on the stock Iberdrola.
-
 ```{r}
-missl_cond_marginal_settings <- marginal_settings(
-  train_size = 1000,
-  refit_size = 50
-)
+bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[6]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[12]])
+```
 
-missl_cond_vine_settings <- vine_settings(
-  train_size = 200,
-  refit_size = 25,
-  family_set = "parametric",
-  vine_type = "dvine"
-)
+The ordering changes quite strongly and quite notably the pairwise dependence in terms of the Kendall's tau is really weak with the index and the second rightmost asset. Next up one will have a look at the Eurostoxx50 index.
 
-future::plan("multisession", workers = 6)
-missl_cond_risk_roll <- estimate_risk_roll(
-  msci_spain_complete_data %>% select(-c(date, msci_spain_index)),
-  weights = NULL,
-  marginal_settings = missl_cond_marginal_settings,
-  vine_settings = missl_cond_vine_settings,
-  alpha = c(0.01, 0.05, 0.1),
-  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
-  n_samples = 1000,
-  n_mc_samples = 1000,
-  cond_vars = "iberdrola",
-  cond_u = c(0.05, 0.5),
-  trace = TRUE
-)
-future::plan("sequential")
+```{r dvines_cond1_16euro, fig.width=15, fig.height=14}
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[6]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[12]])
 ```
 
 ```{r}
-summary(missl_cond_risk_roll)
-```
-A short look at the p-values of the Ljung Box tests.
-
-```{r}
-ljung_heatmap(missl_cond_risk_roll)
+bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[6]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[12]])
 ```
 
+Notably and also like expected the pairwise dependence of the index with the second rightmost asset (Banco Santander) is much stronger. The dependence is also much more anticipated as for example Banco Santander, the Amadeus IT Group, Iberdrola and Inditex are included in the index but only with a cumluative weight of roughly 5%. Thus in a stress testing situation one would expect the conditioning on the Eurostoxx50 index to be much more influential. The same analysis is now performed on the second time frame.
 
-
-Compare the fitted conditional vines with the ones of the unconditional dvine fitting.
-
-```{r}
-# unconditional first
-labeled_vinecop_plot(fitted_vines(missl_risk_roll_d)[[1]])
-bicops_used(fitted_vines(missl_risk_roll_d)[[1]])
-# conditional first
-labeled_vinecop_plot(fitted_vines(missl_cond_risk_roll)[[1]])
-bicops_used(fitted_vines(missl_cond_risk_roll)[[1]])
-# unconditional last
-labeled_vinecop_plot(fitted_vines(missl_risk_roll_d)[[28]])
-# conditional last
-labeled_vinecop_plot(fitted_vines(missl_cond_risk_roll)[[28]])
+```{r dvines_cond1_20sp500, fig.width=17, fig.height=8}
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_sp500)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_sp500)[[4]])
 ```
 
 
+```{r}
+bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[4]])
+```
+
+As in the unconditional case one can detect more extreme value copulas and notably Iberdrola and Inditex are both quite stable in the ordering. Now the Eurostoxx50 index.
+
+```{r dvines_cond1_20euro, fig.width=16, fig.height=8}
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[4]])
+```
+
 
 ```{r}
-# what about the evolution of the conditional values (iberdrola)
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_u = c(0.05, 0.5),
+bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[4]])
+```
+
+The heavy usage of extreme value copulas especially in the first tree level is directly evident. Now Inditex and the Amadeus IT Group, both constituents of the index, show strong dependencies with the index.
+
+### Behavior of the conditioning value
+ 
+As one now conditions the risk measure estimation on each day on a conditioning value from the conditioning variable it is reasonable to first look at the different conditioning values that were estimated. Here one differentiates between the conditioning values based on quantiles and the ones based on the residual of the day before (`prior_resid`). One starts again with the first time frame and the conditioning on the SP500.
+
+```{r cond1_sp500_16_quantiles}
+risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
   geom_line(
-    data = msci_spain_complete_data[1001:nrow(msci_spain_complete_data), ],
-    aes(x = 1001:nrow(msci_spain_complete_data),
-        y = iberdrola), col = "lightgrey", size = .3) +
-  geom_line(aes(x = row_num, y = iberdrola, col = factor(cond_u)),
-            size = 0.5) +
-  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
-                     name = "Conditional alpha level") +
-  labs(title = "Conditional variable: Iberdrola",
-       x = "estimation window", y = "log returns") +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Conditional variable: SP500", col = "Quantile level",
+       x = "estimation window", y = "log returns of the SP500")
+```
 
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_u = c("prior_resid"),
+This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.2 resembles a really bad situation in the American market. The conditional values closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
+
+```{r cond1_sp500_16_priorresid}
+risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
   geom_line(
-    data = msci_spain_complete_data[1001:nrow(msci_spain_complete_data), ],
-    aes(x = 1001:nrow(msci_spain_complete_data),
-        y = iberdrola), col = "lightgrey", size = .3) +
-  geom_line(aes(x = row_num, y = iberdrola),
-            col = custom_colors[4],
-            size = 0.5) +
-  labs(title = "Conditional variable: Iberdrola",
-       x = "estimation window", y = "log returns",
+    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = sp500.x),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Conditional variable: SP500", col = "Quantile level",
+       x = "estimation window", y = "log returns of the SP500",
        subtitle = paste0("The conditional values corresponding to the residual
                          of the prior day are drawn in ",
                      "<span style='color:",
@@ -528,192 +870,157 @@ risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
                      "'>**violet**</span>",
                      ".")) +
   theme_light() +
-  ggforce::facet_zoom(xlim = c(1300, 1330)) +
-  theme(axis.text.x = element_blank(),
-        panel.border = element_blank(),
-        plot.subtitle = ggtext::element_markdown(size = 9),
-        axis.ticks.x = element_blank())
+  ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
+  theme(panel.border = element_blank(),
+        plot.subtitle = ggtext::element_markdown(size = 9))
 ```
 
-Nice to see so we expect the corresponding conditional risk measures with low conditional $\alpha$ level to be way more conservative under the assumption that Iberdrola has a generally positive dependence with the portfolio of interest. Moreover one can observe that the conditional values corresponding to the prior day residuals are closely following the observed path while lagging a little behind and thus exaggerating sudden drops or highs which might be a desirable behavior for risk estimation. Therefore look at the next plots.
+Now the Eurostoxx50 index for the first time frame.
 
-```{r}
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_u = c(0.05, 0.5),
+```{r cond1_euro_16_quantiles}
+risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est,
-                col = factor(cond_u), linetype = factor(cond_u)),
-            size = 0.5) +
-  labs(x = "estimation window", y = "portfolio log returns",
-       linetype = "Conditional alpha level",
-       title = "Comparison of risk measure behavior for 2 conditional alpha levels") +
-  scale_color_manual(values = c(custom_colors[1], custom_colors[3], "violet"),
-                     name = "Conditional alpha level") +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+  geom_line(
+    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
+       x = "estimation window", y = "log returns of the Eurostoxx 50")
+```
 
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+The same pattern as for the other conditional asset is visible. The index however seems to have more extreme market situations.
+
+```{r cond1_euro_16_priorresid}
+risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est),
-            col = custom_colors[4],
-            size = 0.5) +
-  labs(x = "estimation window", y = "portfolio log returns",
-       title = "Behavior of the conditional pior residual risk measure") +
-  theme(axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+  geom_line(
+    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = eurostoxx50.x),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
+       x = "estimation window", y = "log returns of the Eurostoxx 50",
+       subtitle = paste0("The conditional values corresponding to the residual
+                         of the prior day are drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".")) +
+  theme_light() +
+  ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
+  theme(panel.border = element_blank(),
+        plot.subtitle = ggtext::element_markdown(size = 9))
 ```
 
+Again the same pattern as for the SP500 is visible. One now presents these visualizations also for the second time frame.
 
-A close look wrt exceedences.
-
-```{r}
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_u = 0.5,
+```{r cond1_sp500_20_quantiles}
+risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
-             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window",
-       y = "portfolio log returns",
-       col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
-                     "<span style='color:",
-                     custom_colors[2],
-                     "'>**red**</span>",
-                     "."),
-       title = "Risk measure: ES (mean estimation) with alpha level 0.05, conditional alpha level 0.5"
-       ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
+  geom_line(
+    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Conditional variable: SP500", col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the SP500")
+```
 
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
-               cond_u = 0.05,
-               alpha = 0.05, exceeded = TRUE) %>%
-  ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
-             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window",
-       y = "portfolio log returns",
-       col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
-                     "<span style='color:",
-                     custom_colors[2],
-                     "'>**red**</span>",
-                     "."),
-       title = "Risk measure: ES (mean estimation) with alpha and conditional alpha level 0.05"
-       ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
-
-risk_estimates(missl_cond_risk_roll, risk_measures = "ES_mean",
+```{r cond1_sp500_20_priorresid}
+risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
-             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window",
-       y = "portfolio log returns",
-       col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
+  geom_line(
+    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.3) +
+  geom_line(aes(x = date, y = sp500.x),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Conditional variable: SP500", col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the SP500",
+       subtitle = paste0("The conditional values corresponding to the residual
+                         of the prior day are drawn in ",
                      "<span style='color:",
-                     custom_colors[2],
-                     "'>**red**</span>",
-                     "."),
-       title = "Risk measure: ES (mean estimation) with alpha and prior residual conditional level"
-       ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".")) 
 ```
 
-While the 0.5 conditional value leads to lots of exceedances (not surprisingly) the conditional value of 0.05 shows not many exceedances. For a rough comparison one can have a short comparison with the above fitted unconditional ES with mean estimation for the same confidence level.
+The slight delay of the conditional values is clearly visible.
 
-```{r}
-risk_estimates(missl_risk_roll,
-               risk_measures = c("ES_mean"),
-               alpha = 0.05,
-               exceeded = TRUE) %>%
+```{r cond1_euro_20_quantiles}
+risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
   ggplot() +
-  geom_line(aes(x = row_num, y = realized), col = "lightgrey") +
-  geom_line(aes(x = row_num, y = risk_est), col = custom_colors[1]) +
-  geom_point(aes(x = row_num, y = realized), col = custom_colors[2], 
-             inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window",
-       y = "portfolio log returns",
-       col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
+  geom_line(
+    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50")
+```
+
+
+```{r cond1_euro_20_priorresid}
+risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
+               cond_u = "prior_resid",
+               alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.4) +
+  geom_line(aes(x = date, y = eurostoxx50.x),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50",
+       subtitle = paste0("The conditional values corresponding to the residual
+                         of the prior day are drawn in ",
                      "<span style='color:",
-                     custom_colors[2],
-                     "'>**red**</span>",
-                     "."),
-       title = "Risk measure: ES (mean estimation) with alpha level 0.05"
-       ) +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    legend.position = "none")
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     "."))
 ```
 
-So in the direct comparison the conditional risk measure is way more conservative and might help in stresstesting situations for projected hard times of specific conditional assets.
+Again the same patterns as before are visible.
+
+### The conditional risk measure estimates
+
+visualize them
+have a look at which level they fail the traditional backtests
+traditional backtest the prior residual risk measure and maybe compare with unconditional
+
+
+## Double conditional risk measure estimation
 
 
 
 
 
-## Double conditional short trial
 
-Here just the estimation with two conditional values is tested shortly.
 
-```{r}
-cond2test_marginal_settings <- marginal_settings(
-  train_size = 1000,
-  refit_size = 50
-)
 
-cond2test_vine_settings <- vine_settings(
-  train_size = 200,
-  refit_size = 25,
-  family_set = "parametric",
-  vine_type = "dvine"
-)
 
-future::plan("multisession", workers = 6)
-cond2test_risk_roll <- estimate_risk_roll(
-  msci_spain_complete_data %>% select(-c(date, msci_spain_index)),
-  weights = NULL,
-  marginal_settings = cond2test_marginal_settings,
-  vine_settings = cond2test_vine_settings,
-  alpha = c(0.01, 0.05, 0.1),
-  risk_measures = c("VaR", "ES_mean", "ES_median", "ES_mc"),
-  n_samples = 1000,
-  n_mc_samples = 1000,
-  cond_vars = c("iberdrola", "banco_santander"),
-  cond_u = c(0.05, 0.5),
-  trace = TRUE
-)
-future::plan("sequential")
-```
-
-```{r}
-summary(cond2test_risk_roll)
-head(risk_estimates(cond2test_risk_roll))
-```
 
 
 

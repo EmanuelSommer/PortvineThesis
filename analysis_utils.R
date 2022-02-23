@@ -168,3 +168,138 @@ labeled_vinecop_plot <- function(vine, tree = 1) {
 bicops_used <- function(vine) {
   table(unlist(vine$pair_copulas)[names(unlist(vine$pair_copulas)) == "family"])
 }
+
+
+
+
+# backtesting utilities
+get_traditional_backtests_uncond <- function(roll, alphas) {
+  res <- tribble(
+    ~"Risk measure", ~"Backtest",
+    "VaR", "unconditional coverage",
+    "VaR", "conditional coverage",
+    "ES", "exceedance residuals (two sided)",
+    "ES", "exceedance residuals (one sided)",
+    "ES", "simple conditional calibration (two sided)",
+    "ES", "simple conditional super-calibration (one sided)",
+    "ES", "strict ESR test (two sided)",
+    "ES", "one sided intercept ESR test",
+  )
+  for (alpha in alphas) {
+    res_vec <- numeric(8)
+    ### VaR
+    temp <- rugarch::VaRTest(
+      alpha = alpha,
+      actual = risk_estimates(roll, "VaR", alpha) %>%
+        pull(realized),
+      VaR = risk_estimates(roll, "VaR", alpha) %>%
+        pull(risk_est)
+    )[c("uc.LRp", "cc.LRp")]
+    res_vec[1] <- temp[[1]]
+    res_vec[2] <- temp[[2]]
+    ### ES
+    # exceedance residuals
+    temp <- esback::er_backtest(
+      r = risk_estimates(roll, "VaR", alpha) %>%
+        pull(realized),
+      q = risk_estimates(roll, "VaR", alpha) %>%
+        pull(risk_est),
+      e = risk_estimates(roll, "ES_mean", alpha) %>%
+        pull(risk_est)
+    )
+    res_vec[3] <- temp$pvalue_twosided_simple
+    res_vec[4] <- temp$pvalue_onesided_simple
+    # conditional calibration
+    temp <- esback::cc_backtest(
+      r = risk_estimates(roll, "VaR", alpha) %>%
+        pull(realized),
+      q = risk_estimates(roll, "VaR", alpha) %>%
+        pull(risk_est),
+      e = risk_estimates(roll, "ES_mean", alpha) %>%
+        pull(risk_est),
+      alpha = alpha
+    )
+    res_vec[5] <- temp$pvalue_twosided_simple
+    res_vec[6] <- temp$pvalue_onesided_simple
+    # ESR tests
+    temp <- try(
+      esback::esr_backtest(
+        r = risk_estimates(roll, "VaR", alpha) %>%
+          pull(realized),
+        q = risk_estimates(roll, "VaR", alpha) %>%
+          pull(risk_est),
+        e = risk_estimates(roll, "ES_mean", alpha) %>%
+          pull(risk_est),
+        alpha = alpha,
+        version = 1
+      ), silent = TRUE)
+    if ("try-error" %in% class(temp)) {
+      res_vec[7] <- -1
+    } else {
+      res_vec[7] <- temp$pvalue_twosided_asymptotic
+    }
+
+    temp <- try(
+      esback::esr_backtest(
+        r = risk_estimates(roll, "VaR", alpha) %>%
+          pull(realized),
+        q = risk_estimates(roll, "VaR", alpha) %>%
+          pull(risk_est),
+        e = risk_estimates(roll, "ES_mean", alpha) %>%
+          pull(risk_est),
+        alpha = alpha,
+        version = 3
+      ), silent = TRUE)
+    if ("try-error" %in% class(temp)) {
+      res_vec[8] <- -1
+    } else {
+      res_vec[8] <- temp$pvalue_onesided_asymptotic
+    }
+    res <- res %>%
+      bind_cols("temp" = res_vec) %>%
+      rename(!!paste("alpha:", alpha) := temp)
+  }
+  res
+}
+
+# comparative backtesting as in Nolde and Ziegel 2017
+
+es_scoring <- function(realized, es, var, alpha) {
+  if (any(es >= 0)) stop("ES must be always negative for this scoring function")
+  ((realized < var) * (realized  - var) / es) +
+    alpha * ((var / es) - 1 + log(-es))
+}
+
+# interpretation if confidence_result is smaller than the specified nu then the
+# model corresponding to roll1 is considered at least as good as the roll2 model
+es_comparative_backtest <- function(roll1, roll2, alpha) {
+  realized1 <- risk_estimates(roll1, "ES_mean", alpha) %>%
+    pull(realized)
+  var1 <- risk_estimates(roll1, "VaR", alpha) %>%
+    pull(risk_est)
+  es1 <- risk_estimates(roll1, "ES_mean", alpha) %>%
+    pull(risk_est)
+  scoring1 <- es_scoring(
+    realized = realized1,
+    es = es1,
+    var = var1,
+    alpha = alpha
+  )
+  realized2 <- risk_estimates(roll2, "ES_mean", alpha) %>%
+    pull(realized)
+  var2 <- risk_estimates(roll2, "VaR", alpha) %>%
+    pull(risk_est)
+  es2 <- risk_estimates(roll2, "ES_mean", alpha) %>%
+    pull(risk_est)
+  scoring2 <- es_scoring(
+    realized = realized2,
+    es = es2,
+    var = var2,
+    alpha = alpha
+  )
+  n <- length(realized1)
+  sigma <- sd(scoring1 - scoring2)
+  test_statistic <- mean(scoring1 - scoring2) * sqrt(n) / sigma
+  confidence_result <- pnorm(test_statistic)
+  c(test_statistic = test_statistic, confidence_result = confidence_result)
+}
