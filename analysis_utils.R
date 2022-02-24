@@ -434,3 +434,36 @@ es_cond_comparative_backtest <- function(cond_roll1, roll2, alpha, cond_u) {
   confidence_result <- pnorm(test_statistic)
   c(test_statistic = test_statistic, confidence_result = confidence_result)
 }
+
+# heatmap that displays at which quantile level the conditional risk measures
+# would pass the traditional backtests. This can be used to infer knowledge
+# about the influence of the certain conditional asset on the portfolio level
+# risk measures
+cond_backtest_heatmap <- function(roll, alpha, cond_u) {
+  plot_df <- map_df(cond_u, function(u) {
+    get_traditional_backtests_cond(
+      roll,
+      alphas = alpha,
+      cond_u = u
+    ) %>%
+      mutate(cond_u = u)
+  }) %>%
+    mutate(test = paste0(`Risk measure`, ": ", Backtest)) %>%
+    select(starts_with("alpha"), cond_u, test)
+  colnames(plot_df)[1] <- "pval"
+  plot_df %>%
+    mutate(pval = if_else(is.nan(pval) | pval == -1, NA_real_, pval),
+           test = fct_rev(fct_inorder(factor(test)))) %>%
+    ggplot(aes(x = factor(cond_u), y = test, fill = pval)) +
+    geom_tile() +
+    scale_fill_gradientn(colours = c(custom_colors[2],"#C37285" ,
+                                     custom_colors[1], "#2a82db"),
+                         values = scales::rescale(c(0, 0.05 - 0.01,
+                                                    0.05, 1)),
+                         breaks = c(0.05),
+                         labels = c(0.05),
+                         guide = guide_colourbar(nbin = 1000)) +
+    labs(y = "", x = "Quantile level", fill = "P-value",
+         title = "Traditional backtests on the conditional risk measures",
+         subtitle = paste("Alpha level:", alpha))
+}

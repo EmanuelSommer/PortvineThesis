@@ -1028,7 +1028,19 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
 ```
 
-As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. Now the risk measures based on the prior residuals.
+As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. 
+
+```{r cond1_euro_16_quantileheat}
+cond_backtest_heatmap(cond_risk_roll_16_19_sp500,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond_risk_roll_16_19_sp500,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
+
+Now the risk measures based on the prior residuals.
 
 ```{r cond1_rm_sp500_16_priorresid}
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
@@ -1095,6 +1107,16 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
 
 Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures.
 
+```{r cond1_euro_16_quantileheat}
+cond_backtest_heatmap(cond_risk_roll_16_19_eurostoxx50,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond_risk_roll_16_19_eurostoxx50,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
+
 Now the risk measures based on the prior residuals.
 
 ```{r cond1_rm_euro_16_priorresid}
@@ -1149,6 +1171,15 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
 ```
 
+```{r cond1_sp500_20_quantileheat}
+cond_backtest_heatmap(cond_risk_roll_20_21_sp500,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond_risk_roll_20_21_sp500,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
 ```{r cond1_rm_sp500_20_priorresid}
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = "prior_resid",
@@ -1197,6 +1228,16 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
 ```
 
+```{r cond1_euro_20_quantileheat}
+cond_backtest_heatmap(cond_risk_roll_20_21_eurostoxx50,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond_risk_roll_20_21_eurostoxx50,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
+
 ```{r cond1_rm_euro_20_priorresid}
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                cond_u = "prior_resid",
@@ -1220,6 +1261,9 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                      ".<br>Conditional variable: Eurostoxx 50"))
 ```
 
+
+
+
 Again to many violations can be seen here and the exaggeration of drops is clearly visible here. This is also reflected in the results of the traditional backtests below where only 1 of them is slightly passed.
 
 ```{r}
@@ -1231,8 +1275,8 @@ get_traditional_backtests_cond(cond_risk_roll_20_21_eurostoxx50,
 
 
 
-have a look at which quantile level they fail the traditional backtests
-maybe see at which quantile level the comparative backtest is better than the unconditional one
+have a look at which quantile level they fail the traditional backtests (interpret)
+at which level considered better than the unconditional
 
 
 ## Double conditional risk measure estimation
