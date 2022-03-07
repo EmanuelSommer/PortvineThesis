@@ -451,18 +451,28 @@ cond_backtest_heatmap <- function(roll, alpha, cond_u) {
     mutate(test = paste0(`Risk measure`, ": ", Backtest)) %>%
     select(starts_with("alpha"), cond_u, test)
   colnames(plot_df)[1] <- "pval"
-  plot_df %>%
+
+  plot_df <- plot_df %>%
     mutate(pval = if_else(is.nan(pval) | pval == -1, NA_real_, pval),
-           test = fct_rev(fct_inorder(factor(test)))) %>%
+           test = fct_rev(fct_inorder(factor(test))))
+
+  if (all(plot_df$pval >= 0.05 | is.na(plot_df$pval))) {
+    legend_scale <- scale_fill_gradient(
+      low = "#92B8DE", high = "#2a82db"
+    )
+  } else {
+    legend_scale <- scale_fill_gradientn(
+      colours = c("#db4f59","#C37285" ,
+                  "#92B8DE", "#2a82db"),
+      values = scales::rescale(c(0, 0.05 - 0.01, 0.05, 1)),
+      breaks = c(0.05),
+      labels = c(0.05),
+      guide = guide_colourbar(nbin = 1000))
+  }
+  plot_df %>%
     ggplot(aes(x = factor(cond_u), y = test, fill = pval)) +
     geom_tile() +
-    scale_fill_gradientn(colours = c(custom_colors[2],"#C37285" ,
-                                     custom_colors[1], "#2a82db"),
-                         values = scales::rescale(c(0, 0.05 - 0.01,
-                                                    0.05, 1)),
-                         breaks = c(0.05),
-                         labels = c(0.05),
-                         guide = guide_colourbar(nbin = 1000)) +
+    legend_scale +
     labs(y = "", x = "Quantile level", fill = "P-value",
          title = "Traditional backtests on the conditional risk measures",
          subtitle = paste("Alpha level:", alpha))

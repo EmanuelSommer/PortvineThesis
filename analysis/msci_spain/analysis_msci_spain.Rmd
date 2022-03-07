@@ -61,8 +61,8 @@ ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
 
 So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulence, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. The period with the pandemic in place allows to test the backtesting in a higher volatility setting. Thus one will specify the following two time frames of interest.
 
-1. 01.01.2016 - 31.12.2019, the filtered data is contained in `msci_spain_16_19`
-2. 02.04.2020 - 13.10.2021, the filtered data is contained in `msci_spain_20_21`
+1. **01.01.2016 - 31.12.2019**, the filtered data is contained in `msci_spain_16_19`
+2. **02.04.2020 - 13.10.2021**, the filtered data is contained in `msci_spain_20_21`
 
 As all risk estimations are based on the rather high sample size $S$ of 100000 all risk estimations were performed remotely at the Leibniz supercomputing centre and the results saved. This allows to exploit the nested parallelization provided by the `portvine` package.
 
@@ -847,7 +847,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
        x = "estimation window", y = "log returns of the SP500")
 ```
 
-This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.2 resembles a really bad situation in the American market. The conditional values closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
+This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.2 resembles a really bad situation in the American market. The conditional values based on the prior residuals closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
 
 ```{r cond1_sp500_16_priorresid}
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
@@ -1030,7 +1030,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
 
 As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. 
 
-```{r cond1_euro_16_quantileheat}
+```{r cond1_sp500_16_quantileheat}
 cond_backtest_heatmap(cond_risk_roll_16_19_sp500,
                       0.025,
                       seq(0.1,0.9, 0.1))
@@ -1105,7 +1105,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
 ```
 
-Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures.
+Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures. This means that one has to cover the case of a bad European market situation in stress testing scenarios. This is also supported by the plot below that shows that one can only observe passing traditional backtests when one adjusts for low quantile i.e. a bad European market situation.
 
 ```{r cond1_euro_16_quantileheat}
 cond_backtest_heatmap(cond_risk_roll_16_19_eurostoxx50,
@@ -1203,7 +1203,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                      ".<br>Conditional variable: SP500"))
 ```
 
-Again here probably due to the low influence of the SP500 the risk measure is quite similar to the unconditional one. This is also backed by the results of the traditional backtests that even indicate a quite conservative estimation as some two sided hypotheses have to be rejected because of the conservative nature. At the 1%  level there where no VaR exceedances thus the exceedance residual backtest could not even be tested.
+Again here probably due to the low influence of the SP500 the risk measure is quite similar to the unconditional one. This is also backed by the results of the traditional backtests of the prior residual startegy that even indicate a quite conservative estimation as some two sided hypotheses have to be rejected because of the conservative nature. At the 1%  level there where no VaR exceedances thus the exceedance residual backtest could not even be tested.
 
 ```{r}
 get_traditional_backtests_cond(cond_risk_roll_20_21_sp500,
@@ -1237,6 +1237,7 @@ cond_backtest_heatmap(cond_risk_roll_20_21_eurostoxx50,
                       seq(0.1,0.9, 0.1))
 ```
 
+Interestingly one can detect that for higher levels of the conditional Eurostoxx 50 asset than for the first time frame one can pass the traditional backtests. This suggests that in this high volatility situation the influence of the conditional asset diminishes slightly.
 
 ```{r cond1_rm_euro_20_priorresid}
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
@@ -1272,18 +1273,122 @@ get_traditional_backtests_cond(cond_risk_roll_20_21_eurostoxx50,
   mutate(across(starts_with("alpha"), round, digits = 4))
 ```
 
-
-
-
-have a look at which quantile level they fail the traditional backtests (interpret)
-at which level considered better than the unconditional
+All in all the strategy based on the quantiles is much more promising. As further research one could try to truncate the prior day residuals for example with the function $f(z) = max(0,z)$. But this could of course lead to too conservative estimates. 
 
 
 ## Double conditional risk measure estimation
 
-a look at the dvines
-a look at the conditional risk measures
-maybe again heatmap for failing traditional backtests
+For  the double conditional case one sticks to the given portfolio and now considers both the SP500 and the Eurostoxx50 as the conditional assets. Thus one does not need to further check the marginal models. A look at the fitted D-vines is however advisable. From the ordering algorithm one would now definetly expect the SP500 to be the rightmost leaf, predecessed by the Eurostoxx 50 asset.
+
+```{r}
+# load the double conditional models
+load(here::here("data", "msci_spain_cond2_res16.RData"))
+load(here::here("data", "msci_spain_cond2_res20.RData"))
+```
+
+First a look at the model summaries.
+
+```{r}
+summary(cond2_risk_roll_16_19)
+summary(cond2_risk_roll_20_21)
+```
+
+
+### A look at the D-vines
+
+Here one uses D-vines with the fixed positions of the indices at the rightmost leafs. One can have a look whether the ordering changes over time and which asset seems to be most influenced by the market index. Again also the fitted bivariate copulas are of interest.
+
+One starts with the first time frame.
+
+```{r dvines_cond2_16, fig.width=14, fig.height=8}
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[1]])
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[6]])
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[12]])
+```
+
+In the further vine windows the bivariate relationship between the two conditional assets is even the independence copula.
+
+```{r}
+bicops_used(fitted_vines(cond2_risk_roll_16_19)[[1]])
+bicops_used(fitted_vines(cond2_risk_roll_16_19)[[6]])
+bicops_used(fitted_vines(cond2_risk_roll_16_19)[[12]])
+```
+
+Now the second time frame.
+
+```{r dvines_cond2_20, fig.width=14, fig.height=8}
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_20_21)[[1]])
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_20_21)[[4]])
+```
+
+In the vines the bivariate relationship between the two conditional assets is again modelled by the independence copula.
+
+```{r}
+bicops_used(fitted_vines(cond2_risk_roll_20_21)[[1]])
+bicops_used(fitted_vines(cond2_risk_roll_20_21)[[4]])
+```
+
+Similarly to the single conditional and unconditional case one can observe more extreme value copulas for the second time frame. From these results one would expect the double conditional risk measures to behave like the single conditional ones conditioned on the Eurostoxx 50 index.
+
+### The conditional risk measure estimates
+
+First goes the first time frame and indeed the expectations are met.
+
+```{r cond2_rm_16_quantiles}
+risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, SP500")
+```
+
+```{r cond2_euro_16_quantileheat}
+cond_backtest_heatmap(cond2_risk_roll_16_19,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond2_risk_roll_16_19,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
+
+Same goes for the second time frame.
+
+```{r cond2_rm_20_quantiles}
+risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
+               cond_u = seq(0.1, 0.9, 0.1),
+               alpha = 0.025, exceeded = TRUE) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
+             size = 0.5) +
+  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+       x = "estimation window (2021)", y = "portfolio log returns",
+       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, SP500")
+```
+
+```{r cond2_euro_20_quantileheat}
+cond_backtest_heatmap(cond2_risk_roll_20_21,
+                      0.025,
+                      seq(0.1,0.9, 0.1))
+cond_backtest_heatmap(cond2_risk_roll_20_21,
+                      0.05,
+                      seq(0.1,0.9, 0.1))
+```
+
 
 
 
