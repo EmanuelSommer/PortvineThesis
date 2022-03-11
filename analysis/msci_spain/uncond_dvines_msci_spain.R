@@ -1,7 +1,4 @@
-### Unconditional msci spain risk estimates for the case studies but with
-### restricted copula families e.g. only gaussian
-
-
+### unconditional risk estimates based on D-vines for comparison
 # load the data
 load("msci_spain_data_clean.RData")
 
@@ -11,7 +8,6 @@ library(future)
 
 # hyperparameters
 alpha_values <- c(0.01, 0.025, 0.05, 0.95)
-cond_u_values <- seq(0.1, 0.9, 0.1)
 risk_measure_values <- c("VaR", "ES_mean", "ES_mc", "ES_median")
 # for the weights use the market cap from 29.10.2021. Changing weights would
 # be possible on the vine level but here for simplicity one will stick to
@@ -32,7 +28,7 @@ weights_values <- c(
 future::plan(list(future::tweak(future::multicore, workers = 12),
                   future::tweak(future::multicore, workers = 13)))
 
-uncond_risk_roll_16_19_t <- estimate_risk_roll(
+uncond_risk_roll_16_19_dvine <- estimate_risk_roll(
   data = msci_spain_16_19[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
@@ -40,33 +36,18 @@ uncond_risk_roll_16_19_t <- estimate_risk_roll(
     refit_size = 50
   ),
   vine_settings = vine_settings(
-    train_size = 250,
+    train_size = 500,
     refit_size = 50,
-    family_set = c("gaussian", "t")
+    family_set = "parametric",
+    vine_type = "dvine"
   ),
   alpha = alpha_values,
   risk_measures = risk_measure_values,
   n_samples = 100000,
   n_mc_samples = 10000
 )
-uncond_risk_roll_16_19_gauss <- estimate_risk_roll(
-  data = msci_spain_16_19[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 750,
-    refit_size = 50
-  ),
-  vine_settings = vine_settings(
-    train_size = 250,
-    refit_size = 50,
-    family_set = c("gaussian")
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
-uncond_risk_roll_20_21_t <- estimate_risk_roll(
+
+uncond_risk_roll_20_21_dvine <- estimate_risk_roll(
   data = msci_spain_20_21[, 3:11],
   weights = weights_values,
   marginal_settings = marginal_settings(
@@ -76,24 +57,8 @@ uncond_risk_roll_20_21_t <- estimate_risk_roll(
   vine_settings = vine_settings(
     train_size = 200,
     refit_size = 50,
-    family_set = c("gaussian", "t")
-  ),
-  alpha = alpha_values,
-  risk_measures = risk_measure_values,
-  n_samples = 100000,
-  n_mc_samples = 10000
-)
-uncond_risk_roll_20_21_gauss <- estimate_risk_roll(
-  data = msci_spain_20_21[, 3:11],
-  weights = weights_values,
-  marginal_settings = marginal_settings(
-    train_size = 300,
-    refit_size = 50
-  ),
-  vine_settings = vine_settings(
-    train_size = 200,
-    refit_size = 50,
-    family_set = c("gaussian")
+    family_set = "parametric",
+    vine_type = "dvine"
   ),
   alpha = alpha_values,
   risk_measures = risk_measure_values,
@@ -104,8 +69,7 @@ uncond_risk_roll_20_21_gauss <- estimate_risk_roll(
 future::plan("sequential")
 
 save(
-  uncond_risk_roll_16_19_t, uncond_risk_roll_20_21_t,
-  uncond_risk_roll_16_19_gauss, uncond_risk_roll_20_21_gauss,
-  file = "msci_spain_uncond_gausst.RData"
+  uncond_risk_roll_16_19_dvine,
+  uncond_risk_roll_20_21_dvine,
+  file = "msci_spain_uncond_dvines.RData"
 )
-
