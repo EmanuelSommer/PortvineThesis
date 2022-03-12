@@ -9,9 +9,9 @@ library(portvine)
 library(future)
 
 # hyperparameters
-alpha_values <- c(0.01, 0.025, 0.05, 0.95)
-cond_u_values <- seq(0.1, 0.9, 0.1)
-risk_measure_values <- c("VaR", "ES_mean", "ES_mc", "ES_median")
+alpha_values <- c(0.01, 0.025, 0.05, 0.25, 0.5, 0.75, 0.95)
+cond_u_values <- c(0.05, 0.1, 0.25, 0.5)
+risk_measure_values <- c("VaR", "ES_mean")
 # for the weights use the market cap from 29.10.2021. Changing weights would
 # be possible on the vine level but here for simplicity one will stick to
 # constant weights
@@ -48,7 +48,7 @@ cond_risk_roll_20_21_sp500 <- estimate_risk_roll(
   ),
   vine_settings = vine_settings(
     train_size = 200,
-    refit_size = 25,
+    refit_size = 50,
     family_set = "parametric",
     vine_type = "dvine"
   ),
@@ -57,7 +57,7 @@ cond_risk_roll_20_21_sp500 <- estimate_risk_roll(
   n_samples = 100000,
   n_mc_samples = 10000,
   cond_vars = "sp500",
-  cond_u = seq(0.1, 0.9, 0.1)
+  cond_u = cond_u_values
 )
 
 # conditioning on the eurostoxx50 index
@@ -70,7 +70,7 @@ cond_risk_roll_20_21_eurostoxx50 <- estimate_risk_roll(
   ),
   vine_settings = vine_settings(
     train_size = 200,
-    refit_size = 25,
+    refit_size = 50,
     family_set = "parametric",
     vine_type = "dvine"
   ),
@@ -79,7 +79,7 @@ cond_risk_roll_20_21_eurostoxx50 <- estimate_risk_roll(
   n_samples = 100000,
   n_mc_samples = 10000,
   cond_vars = "eurostoxx50",
-  cond_u = seq(0.1, 0.9, 0.1)
+  cond_u = cond_u_values
 )
 
 
