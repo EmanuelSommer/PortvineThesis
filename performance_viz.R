@@ -4,7 +4,8 @@ custom_colors <- c("#92B8DE", "#db4f59", "#477042", "#cc72d6")
 theme_set(
   theme_minimal() +
     theme(plot.title = element_text(size = 11),
-          plot.subtitle = element_text(size = 9))
+          plot.subtitle = element_text(size = 9),
+          legend.position = "bottom")
 )
 # load the performance results:
 load("data/performance_uncond.RData")
@@ -40,11 +41,11 @@ uncond_results_df %>%
   geom_point(size = 2) +
   geom_line(alpha = 0.4) +
   ylim(0, NA) +
-  scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
+  scale_color_manual(values = custom_colors[2:4], name = "Simulation sample size") +
   labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
-       shape = "Sample size",
-       title = "Influence of the sample size on runtime",
+       shape = "Simulation sample size",
+       title = "Influence of the simulation sample size on runtime",
        subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: unconditional")
 
 
@@ -61,7 +62,7 @@ uncond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Number of variables",
        title = "Influence of the number of variables on runtime",
-       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: unconditional\nSample size: 10000\nParallel strategy: 10/2"
+       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: unconditional\nSimulation sample size: 10000\nParallel strategy: 10/2"
        ) +
   theme(panel.grid.minor.x = element_blank())
 
@@ -88,7 +89,7 @@ uncond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Allowed copula families",
        title = "Influence of the allowed copula families on runtime",
-       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSample size: 10000\nParallel strategy: 10/2\nEstimation: unconditional"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSimulation sample size: 10000\nParallel strategy: 10/2\nEstimation: unconditional"
        )
 
 #-------------------------------------------------------------------------
@@ -132,16 +133,16 @@ cond_results_df %>%
   geom_point(size = 2) +
   geom_line(alpha = 0.4) +
   ylim(0, NA) +
-  scale_color_manual(values = custom_colors[2:4], name = "Sample size") +
+  scale_color_manual(values = custom_colors[2:4], name = "Simulation sample size") +
   geom_segment(aes(x = 7.5, y = 80, xend = 8.9, yend = 35),
                arrow = arrow(length = unit(0.3, "cm")),
                col = "#6e6e6e") +
   annotate("text", x = 6.8, y = 90, size = 3.5, col = "#6e6e6e",
-           label = "Only 1 estimated\nquantile level\ninstead of 2") +
+           label = "Only 1 fixed\nquantile level\ninstead of 2") +
   labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
-       shape = "Sample size",
-       title = "Influence of the sample size on runtime",
+       shape = "Simulation sample size",
+       title = "Influence of the simulation sample size on runtime",
        subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional")
 # without the 100000
 cond_results_df %>%
@@ -160,7 +161,7 @@ cond_results_df %>%
   labs(x = "Parallel stratgey: first/second level parallelization",
        y = "Runtime in minutes",
        shape = "Sample size",
-       title = "Influence of the sample size on runtime",
+       title = "Influence of the simulation sample size on runtime",
        subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional")
 
 
@@ -177,7 +178,7 @@ cond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Number of variables",
        title = "Influence of the number of variables on runtime",
-       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional\nSample size: 10000\nParallel strategy: 10/2"
+       subtitle = "Observations per variable: 1000\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nEstimation: conditional\nSimulation sample size: 10000\nParallel strategy: 10/2"
   ) +
   theme(panel.grid.minor.x = element_blank())
 
@@ -204,7 +205,7 @@ cond_results_df %>%
   labs(y = "Runtime in minutes",
        x = "Allowed copula families",
        title = "Influence of the allowed copula families on runtime",
-       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSample size: 10000\nParallel strategy: 10/2\nEstimation: conditional"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nSimulation sample size: 10000\nParallel strategy: 10/2\nEstimation: conditional"
   )
 
 tibble(x = c(2, 5, 10),
@@ -218,6 +219,6 @@ tibble(x = c(2, 5, 10),
   labs(y = "Runtime in minutes",
        x = "Number of quantile levels estimated",
        title = "Influence of the number of estimated quantile levels on runtime",
-       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nSample size: 10000\nParallel strategy: 10/4\nEstimation: conditional"
+       subtitle = "Variables: 10 with 1000 observations\nMarginal windows: 5 of size 50\nVine windows: 10 of size 25\nAllowed copula families: all parametric\nSimulation sample size: 10000\nParallel strategy: 10/4\nEstimation: conditional"
   ) +
   theme(panel.grid.minor.x = element_blank())
