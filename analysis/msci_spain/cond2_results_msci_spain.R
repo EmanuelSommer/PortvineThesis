@@ -18,7 +18,7 @@ risk_measure_values <- c("VaR", "ES_mean")
 # be possible on the vine level but here for simplicity one will stick to
 # constant weights
 weights_values <- c(
-  iberdrola = 60.48,
+  iberdrola = 0,
   banco_santander = 56.82,
   bbv_argentaria = 40.42,
   inditex = 34.08,
@@ -27,8 +27,7 @@ weights_values <- c(
   telefonica = 19.37,
   repsol_ypf = 16.04,
   ferrovial = 12.99,
-  eurostoxx50 = 0,
-  sp500 = 0
+  eurostoxx50 = 0
 )
 
 
