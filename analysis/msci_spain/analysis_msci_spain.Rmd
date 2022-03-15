@@ -55,8 +55,25 @@ This means that the time frame is from the 11th Mai of 2015 until the 8th Novemb
 ```{r msci_spain_overall, echo=FALSE}
 ggplot(msci_spain_complete_data, aes(x = date, y = msci_spain_index)) +
   geom_line() +
+  annotate("rect", fill = custom_colors[1], alpha = 0.5, 
+        xmin = as.POSIXct("2016-01-01"), xmax = as.POSIXct("2019-12-31"),
+        ymin = -Inf, ymax = Inf) +
+  annotate("text",
+           label = "Time frame 1",
+           x = as.POSIXct("2018-01-01"), y = -0.1) +
+  geom_vline(xintercept = as.POSIXct("2018-11-16"), col = custom_colors[1],
+             size = 1) +
+  annotate("rect", fill = custom_colors[3], alpha = 0.5, 
+        xmin = as.POSIXct("2020-04-02"), xmax = as.POSIXct("2021-10-13"),
+        ymin = -Inf, ymax = Inf) +
+  geom_vline(xintercept = as.POSIXct("2021-05-27"), col = custom_colors[3],
+             size = 1) +
+  annotate("text",
+           label = "Time frame 2",
+           x = as.POSIXct("2020-11-01"), y = -0.1) +
   labs(x = "", y = "Daily log return",
-       title = "MSCI Spain index") 
+       title = "MSCI Spain index",
+       subtitle = "The vertical lines separate the respective training and forecasting windows.") 
 ```
 
 So one can observe greater volatility during the stock market selloffs 2015-2016 maybe due to Chinese stock market turbulence, the EU dept crisis and the Brexit votum as well as for the first 'Covid-19 year' 2020. The period with the pandemic in place allows to test the backtesting in a higher volatility setting. Thus one will specify the following two time frames of interest.
@@ -141,6 +158,7 @@ A more comprehensive yet less informative visualization is achieved via the heat
 
 ```{r heatmap_16}
 ljung_heatmap(uncond_risk_roll_16_19_g50_k25_p250)
+ljung_heatmap(uncond_risk_roll_16_19_g50_k25_p250, roll_num = 6)
 ```
 
 The interactive version even allows to see how the marginal models of all the marginal windows behave w.r.t. the Ljung Box test.
@@ -173,6 +191,7 @@ A more comprehensive yet less informative visualization is again achieved via th
 
 ```{r heatmap_20}
 ljung_heatmap(uncond_risk_roll_20_21_g50_k25_p200)
+ljung_heatmap(uncond_risk_roll_20_21_g50_k25_p200, roll_num = 2)
 ```
 
 The interactive version again allows to see how the marginal models of all the marginal windows behave w.r.t. the Ljung Box test.
@@ -211,7 +230,7 @@ bicops_used(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[1]])
 bicops_used(fitted_vines(uncond_risk_roll_20_21_g50_k25_p200)[[4]])
 ```
 
-It is obvious that in this high volatility time frame the use of extreme value copulas is much higher than in the previous time frame. Again the Banco Santander assets seems to have a central role in this portfolio.
+It is obvious that in this high volatility time frame the use of copulas that stress tail dependence is much higher than in the previous time frame. Again the Banco Santander assets seems to have a central role in this portfolio.
 
 ### Expected Shortfall estimators
 
@@ -358,6 +377,9 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
             by = "row_num") %>%
+  mutate(risk_measure = if_else(
+    risk_measure == "ES_mean", "ES", risk_measure)
+  ) %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
   geom_line(aes(x = date, y = risk_est,
@@ -366,6 +388,26 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Risk measure",
        title = "Comparison of risk measure behaivior for alpha level 0.01") +
+  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
+                     name = "Risk measure") 
+
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.05) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  mutate(risk_measure = if_else(
+    risk_measure == "ES_mean", "ES", risk_measure)
+  ) %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = risk_est,
+                col = risk_measure, linetype = risk_measure),
+            size = 0.5) +
+  labs(x = "estimation window", y = "portfolio log returns",
+       linetype = "Risk measure",
+       title = "Comparison of risk measure behaivior for alpha level 0.05") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
                      name = "Risk measure") 
 ```
@@ -379,6 +421,9 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
             by = "row_num") %>%
+  mutate(risk_measure = if_else(
+    risk_measure == "ES_mean", "ES", risk_measure)
+  ) %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
   geom_line(aes(x = date, y = risk_est,
@@ -399,7 +444,7 @@ Now some exemplary **exceedance plots**.
 # first time frame
 risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("VaR"),
-               alpha = 0.01,
+               alpha = 0.025,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -417,14 +462,14 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: VaR with alpha level 0.01"
+       title = "Risk measure: VaR with alpha level 0.025"
        ) +
   theme(legend.position = "none")
 
 # second time frame
 risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
                risk_measures = c("VaR"),
-               alpha = 0.01,
+               alpha = 0.025,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -442,7 +487,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: VaR with alpha level 0.01"
+       title = "Risk measure: VaR with alpha level 0.025"
        ) +
   theme(legend.position = "none")
 ```
@@ -453,7 +498,7 @@ For the visualization of the ES it is reasonable to not mark the exceedances of 
 # first time frame
 risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01,
+               alpha = 0.025,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -474,7 +519,7 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES with alpha level 0.01"
+       title = "Risk measure: ES with alpha level 0.025"
        ) +
   theme(legend.position = "none")
 ```
@@ -509,6 +554,7 @@ comparative_backtesting_matrix <- function(roll_list, alpha) {
   rownames(res) <- names(roll_list)
   res
 }
+cat("Alpha level 0.01\n")
 comparative_backtesting_matrix(
   list(
     k25_p250 = uncond_risk_roll_16_19_g50_k25_p250,
@@ -518,18 +564,40 @@ comparative_backtesting_matrix(
   ),
   alpha = 0.01
 )
+
+cat("Alpha level 0.05\n")
+comparative_backtesting_matrix(
+  list(
+    k25_p250 = uncond_risk_roll_16_19_g50_k25_p250,
+    k25_p500 = uncond_risk_roll_16_19_g50_k25_p500,
+    k50_p250 = uncond_risk_roll_16_19_g50_k50_p250,
+    k50_p500 = uncond_risk_roll_16_19_g50_k50_p500
+  ),
+  alpha = 0.05
+)
 ```
 Again one first has a look at the first time frame. Here no definite decisions are possible. The results however provide some indications. For example the longer vine training window size of 500 seems to be slightly better than the shorter training window size. Moreover the smaller vine window of 25 does not seem to be necessary. The window size of 50 might even be in cases superior. So overall from the indications one would probably opt for the model with vine training size of 500 and refit size 50.
 
 In this setting one has also estimated the risk measures with only Gaussian and Student's t components (now referred to as a t-vine). Thus a comparison would be very interesting.
 
 ```{r}
+cat("Alpha level 0.01\n")
 comparative_backtesting_matrix(
   list(
     all = uncond_risk_roll_16_19_g50_k50_p250,
-    gaussian_t = uncond_risk_roll_16_19_t
+    gaussian_t = uncond_risk_roll_16_19_t,
+    gauss = uncond_risk_roll_16_19_gauss
   ),
   alpha = 0.01
+)
+cat("Alpha level 0.05\n")
+comparative_backtesting_matrix(
+  list(
+    all = uncond_risk_roll_16_19_g50_k50_p250,
+    gaussian_t = uncond_risk_roll_16_19_t,
+    gauss = uncond_risk_roll_16_19_gauss
+  ),
+  alpha = 0.05
 )
 ```
 
@@ -539,7 +607,7 @@ There is a slight tendency towards the t-vine model. One can have a look at the 
 (
 risk_estimates(uncond_risk_roll_16_19_g50_k50_p250,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01,
+               alpha = 0.05,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -560,13 +628,13 @@ risk_estimates(uncond_risk_roll_16_19_g50_k50_p250,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES with alpha level 0.01, all parametric copula families"
+       title = "Risk measure: ES with alpha level 0.05, all parametric copula families"
        ) +
   theme(legend.position = "none")
 ) / (
 risk_estimates(uncond_risk_roll_16_19_t,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01,
+               alpha = 0.05,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -587,7 +655,7 @@ risk_estimates(uncond_risk_roll_16_19_t,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES with alpha level 0.01, only Gaussian and Student's t copulas"
+       title = "Risk measure: ES with alpha level 0.05, only Gaussian and Student's t copulas"
        ) +
   theme(legend.position = "none")
 )
@@ -607,6 +675,16 @@ comparative_backtesting_matrix(
   ),
   alpha = 0.01
 )
+
+comparative_backtesting_matrix(
+  list(
+    k25_p100 = uncond_risk_roll_20_21_g50_k25_p100,
+    k25_p200 = uncond_risk_roll_20_21_g50_k25_p200,
+    k50_p100 = uncond_risk_roll_20_21_g50_k50_p100,
+    k50_p200 = uncond_risk_roll_20_21_g50_k50_p200
+  ),
+  alpha = 0.05
+)
 ```
 
 Here as above a tendency towards the bigger vine training window size is visible. No definitive answer can be given however. There is no clear indication whether the shorter or bigger vine rolling window of 25 or 50 performs better. From these indications one would probably opt for the model with vine training size 200 and refit size 50.
@@ -618,19 +696,28 @@ Again for the comparison a t-vine model was fitted.
 comparative_backtesting_matrix(
   list(
     all = uncond_risk_roll_20_21_g50_k50_p200,
-    gaussian_t = uncond_risk_roll_20_21_t
+    gaussian_t = uncond_risk_roll_20_21_t,
+    gauss = uncond_risk_roll_20_21_gauss
   ),
   alpha = 0.01
 )
+comparative_backtesting_matrix(
+  list(
+    all = uncond_risk_roll_20_21_g50_k50_p200,
+    gaussian_t = uncond_risk_roll_20_21_t,
+    gauss = uncond_risk_roll_20_21_gauss
+  ),
+  alpha = 0.05
+)
 ```
 
-Contrary to the setting in the first time frame one can observe that here there is an indication visible that the general R-vine model does perform better. The decision is however not definitive. Once again a visual inspection is reasonable.
+Contrary to the setting in the first time frame one can observe that here there is a clear indication visible that the general R-vine model does perform better. The decision is however not definitive. Once again a visual inspection is reasonable.
 
 ```{r es_comparison_tvine_20}
 (
 risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01,
+               alpha = 0.05,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -651,13 +738,13 @@ risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES with alpha level 0.01, all parametric copula families"
+       title = "Risk measure: ES with alpha level 0.05, all parametric copula families"
        ) +
   theme(legend.position = "none")
 ) / (
 risk_estimates(uncond_risk_roll_20_21_t,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01,
+               alpha = 0.05,
                exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -678,7 +765,7 @@ risk_estimates(uncond_risk_roll_20_21_t,
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
-       title = "Risk measure: ES with alpha level 0.01, only Gaussian and Student's t copulas"
+       title = "Risk measure: ES with alpha level 0.05, only Gaussian and Student's t copulas"
        ) +
   theme(legend.position = "none")
 )
@@ -812,7 +899,7 @@ bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[1]])
 bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[4]])
 ```
 
-As in the unconditional case one can detect more extreme value copulas and notably Iberdrola and Inditex are both quite stable in the ordering. Now the Eurostoxx50 index.
+As in the unconditional case one can detect more copulas that stress tail dependence and notably Iberdrola and Inditex are both quite stable in the ordering. Now the Eurostoxx50 index.
 
 ```{r dvines_cond1_20euro, fig.width=16, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
@@ -825,7 +912,7 @@ bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
 bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[4]])
 ```
 
-The heavy usage of extreme value copulas especially in the first tree level is directly evident. Now Inditex and the Amadeus IT Group, both constituents of the index, show strong dependencies with the index.
+The heavy usage of copulas that stress tail dependence especially in the first tree level is directly evident. Now Inditex and the Amadeus IT Group, both constituents of the index, show strong dependencies with the index.
 
 ### Behavior of the conditioning value
  
@@ -1328,7 +1415,7 @@ bicops_used(fitted_vines(cond2_risk_roll_20_21)[[1]])
 bicops_used(fitted_vines(cond2_risk_roll_20_21)[[4]])
 ```
 
-Similarly to the single conditional and unconditional case one can observe more extreme value copulas for the second time frame. From these results one would expect the double conditional risk measures to behave like the single conditional ones conditioned on the Eurostoxx 50 index.
+Similarly to the single conditional and unconditional case one can observe more copulas that stress tail dependence for the second time frame. From these results one would expect the double conditional risk measures to behave like the single conditional ones conditioned on the Eurostoxx 50 index.
 
 ### The conditional risk measure estimates
 
