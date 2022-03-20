@@ -56,7 +56,7 @@ profvis({
     n_samples = 1000,
     n_mc_samples = 1000,
     cond_vars = "inditex",
-    cond_alpha = c(0.1, 0.5),
+    cond_u = c(0.1, 0.5),
     trace = TRUE
   )
 })
@@ -74,24 +74,9 @@ profvis({
     n_samples = 1000,
     n_mc_samples = 1000,
     cond_vars = c("inditex", "iberdrola"),
-    cond_alpha = c(0.1, 0.5),
+    cond_u = c(0.1, 0.5),
     trace = TRUE
   )
 })
 
 
-# internal conditional sampling function
-
-profvis({
-  int_test <- portvine:::r1conddvine(
-    100, c(0.05, 0.5),
-    fitted_vine = fitted_vines(missl_risk_roll_seq_c1)[[1]]
-  )
-})
-
-profvis({
-  int_test <- portvine:::r2conddvine(
-    100, c(0.05, 0.5),
-    fitted_vine = fitted_vines(missl_risk_roll_seq_c2)[[1]]
-  )
-})
