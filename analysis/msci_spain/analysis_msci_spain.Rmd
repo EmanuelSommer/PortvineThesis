@@ -114,6 +114,19 @@ weights_values <- c(
 )
 ```
 
+```{r assetstsplots}
+msci_spain_complete_data %>%
+  select(-sp500, -eurostoxx50) %>%
+  pivot_longer(-date) %>%
+  mutate(name = str_to_title(str_replace_all(name, "_", " ")),
+         name = fct_inorder(name)) %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  labs(x = "", y = "Daily log returns") +
+  facet_wrap(~name, ncol = 2)
+```
+
+
 One always estimates all available risk measures i.e. VaR and the ES with all three estimation methods (mean, median and monte carlo integration based on 10000 samples). The $\alpha$ levels estimated are 0.01, 0.025, 0.05 and 0.95.
 
 For the marginal models one uses as a default the commonly used ARMA(1,1)-GARCH(1,1) model. If a lack of fit is detected one can adjust this. The training window size for the marginal windows is fixed to 750 days which are roughly 3 financial years in the first time frame and to 300 days in the second time frame. For both time frames the refitting frequency is 50 days which are roughly 2 financial months.
@@ -257,6 +270,22 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
   )
 ```
 
+```{r es_ts_estimators_16, echo=FALSE}
+risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot(aes(x = date, y = risk_est, col = risk_measure)) +
+  geom_line() +
+  scale_color_manual(values = c("orange", custom_colors[3:4]),
+                     name = "Estimator",
+                     label = c("Monte Carlo", "Mean", "Median")) +
+  labs(title = "Comparison of Expected Shortfall estimatiors over time",
+       x = "", y = "Estimated risk measure")
+```
+
 Also one might compare the number of exceedances.
 
 ```{r}
@@ -286,6 +315,22 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p200,
                  zaxis = list(title = 'Monte Carlo')),
     title = "Empirical comparison of Expected Shortfall estimatiors"
   )
+```
+
+```{r es_ts_estimators_20, echo=FALSE}
+risk_estimates(uncond_risk_roll_20_21_g50_k25_p200,
+               risk_measures = c("ES_mean", "ES_median", "ES_mc"),
+               alpha = 0.05) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
+            by = "row_num") %>%
+  ggplot(aes(x = date, y = risk_est, col = risk_measure)) +
+  geom_line() +
+  scale_color_manual(values = c("orange", custom_colors[3:4]),
+                     name = "Estimator",
+                     label = c("Monte Carlo", "Mean", "Median")) +
+  labs(title = "Comparison of Expected Shortfall estimatiors over time",
+       x = "2021", y = "Estimated risk measure")
 ```
 
 Also one might compare the number of exceedances.
@@ -784,6 +829,8 @@ Here one uses the same base portfolio as in the unconditional case but introduce
 # load the single conditional models
 load(here::here("data", "msci_spain_cond1_1619euro.RData"))
 load(here::here("data", "msci_spain_cond1_1619sp500.RData"))
+load(here::here("data", "msci_spain_cond1_1619euro_prior_resid.RData"))
+load(here::here("data", "msci_spain_cond1_1619sp500_prior_resid.RData"))
 load(here::here("data", "msci_spain_cond1_2021.RData"))
 ```
 
@@ -844,7 +891,7 @@ marg_viz_cond_risk_roll_16_19euro$eurostoxx50
 marg_viz2_cond_risk_roll_16_19euro$eurostoxx50
 ```
 
-For the second time frame one can observe a very close call for the mean equation of the marginal model for the conditional variable SP500. As the decision is very close one will not adjust the model in this case.
+For the second time frame one can observe a very close call for the mean equation of the marginal model for the conditional variable SP500. As the decision is very close one will not adjust the model in this case and stick to the default ARMA(1,1)-GARCH(1,1) model.
 
 ```{r residual_plots_cond1_20}
 marg_viz_cond_risk_roll_20_21sp500$sp500
@@ -861,66 +908,66 @@ One starts with the first time frame and the SP500 index.
 
 ```{r dvines_cond1_16sp500, fig.width=14, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[3]])
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[6]])
-labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_sp500)[[12]])
 ```
 
 
 ```{r}
 bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[3]])
 bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[6]])
-bicops_used(fitted_vines(cond_risk_roll_16_19_sp500)[[12]])
 ```
 
 The ordering changes quite strongly and quite notably the pairwise dependence in terms of the Kendall's tau is really weak with the index and the second rightmost asset. Next up one will have a look at the Eurostoxx50 index.
 
 ```{r dvines_cond1_16euro, fig.width=15, fig.height=14}
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[1]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[3]])
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[6]])
-labeled_vinecop_plot(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[12]])
 ```
 
 ```{r}
 bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[1]])
+bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[3]])
 bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[6]])
-bicops_used(fitted_vines(cond_risk_roll_16_19_eurostoxx50)[[12]])
 ```
 
-Notably and also like expected the pairwise dependence of the index with the second rightmost asset (Banco Santander) is much stronger. The dependence is also much more anticipated as for example Banco Santander, the Amadeus IT Group, Iberdrola and Inditex are included in the index but only with a cumluative weight of roughly 5%. Thus in a stress testing situation one would expect the conditioning on the Eurostoxx50 index to be much more influential. The same analysis is now performed on the second time frame.
+Notably and also like expected the pairwise dependence of the index with the second rightmost asset (Banco Santander) is much stronger. The dependence is also much more anticipated as for example Banco Santander, the Amadeus IT Group, Iberdrola and Inditex are included in the index but only with a cumulative weight of roughly 5%. Thus in a stress testing situation one would expect the conditioning on the Eurostoxx50 index to be much more influential. The same analysis is now performed on the second time frame.
 
 ```{r dvines_cond1_20sp500, fig.width=17, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_sp500)[[1]])
-labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_sp500)[[4]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_sp500)[[2]])
 ```
 
 
 ```{r}
 bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[1]])
-bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[4]])
+bicops_used(fitted_vines(cond_risk_roll_20_21_sp500)[[2]])
 ```
 
 As in the unconditional case one can detect more copulas that stress tail dependence and notably Iberdrola and Inditex are both quite stable in the ordering. Now the Eurostoxx50 index.
 
 ```{r dvines_cond1_20euro, fig.width=16, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
-labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[4]])
+labeled_vinecop_plot(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[2]])
 ```
 
 
 ```{r}
 bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[1]])
-bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[4]])
+bicops_used(fitted_vines(cond_risk_roll_20_21_eurostoxx50)[[2]])
 ```
 
 The heavy usage of copulas that stress tail dependence especially in the first tree level is directly evident. Now Inditex and the Amadeus IT Group, both constituents of the index, show strong dependencies with the index.
 
 ### Behavior of the conditioning value
  
-As one now conditions the risk measure estimation on each day on a conditioning value from the conditioning variable it is reasonable to first look at the different conditioning values that were estimated. Here one differentiates between the conditioning values based on quantiles and the ones based on the residual of the day before (`prior_resid`). One starts again with the first time frame and the conditioning on the SP500.
+As one now conditions the risk measure estimation on each day on a conditioning value from the conditioning variable it is reasonable to first look at the different conditioning values that were estimated. Here one differentiates between the conditioning values based on quantiles and the ones based on the residual of the day before (`prior_resid`) and the realized residuals (`resid`). One starts again with the first time frame and the conditioning on the SP500.
 
 ```{r cond1_sp500_16_quantiles}
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -934,10 +981,10 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
        x = "estimation window", y = "log returns of the SP500")
 ```
 
-This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.2 resembles a really bad situation in the American market. The conditional values based on the prior residuals closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
+This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.1 resembles a really bad situation in the American market. The conditional values based on the prior residuals closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
 
 ```{r cond1_sp500_16_priorresid}
-risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+risk_estimates(cond_risk_roll_16_19_sp500_prior_resid, risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
@@ -962,11 +1009,39 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
         plot.subtitle = ggtext::element_markdown(size = 9))
 ```
 
+As expected the realized residual strategy does exactly correspond to the true conditioning value and thus is only for comparative purposues as the conditional risk measures are oracle estimators.
+
+```{r cond1_sp500_16_realizedresid}
+risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+               cond_u = "resid",
+               alpha = 0.05, exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(
+    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+  geom_line(aes(x = date, y = sp500.x),
+             size = 0.5, col = custom_colors[4]) +
+  labs(title = "Conditional variable: SP500", col = "Quantile level",
+       x = "estimation window", y = "log returns of the SP500",
+       subtitle = paste0("The conditional values corresponding to the realized 
+                         residual are drawn in ",
+                     "<span style='color:",
+                     custom_colors[4],
+                     "'>**violet**</span>",
+                     ".")) +
+  theme_light() +
+  ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
+  theme(panel.border = element_blank(),
+        plot.subtitle = ggtext::element_markdown(size = 9))
+```
+
 Now the Eurostoxx50 index for the first time frame.
 
 ```{r cond1_euro_16_quantiles}
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -983,7 +1058,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
 The same pattern as for the other conditional asset is visible. The index however seems to have more extreme market situations.
 
 ```{r cond1_euro_16_priorresid}
-risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
+risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid, risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
@@ -1008,11 +1083,11 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
         plot.subtitle = ggtext::element_markdown(size = 9))
 ```
 
-Again the same pattern as for the SP500 is visible. One now presents these visualizations also for the second time frame.
+Again the same pattern as for the SP500 is visible. The realized residual strategy is not of particular interest to visualize. One now presents these visualizations also for the second time frame.
 
 ```{r cond1_sp500_20_quantiles}
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_20_21 %>%
               mutate(row_num = 1:nrow(msci_spain_20_21)),
@@ -1026,33 +1101,11 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
        x = "estimation window (2021)", y = "log returns of the SP500")
 ```
 
-```{r cond1_sp500_20_priorresid}
-risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
-               cond_u = "prior_resid",
-               alpha = 0.05, exceeded = TRUE) %>%
-  left_join(msci_spain_20_21 %>%
-              mutate(row_num = 1:nrow(msci_spain_20_21)),
-            by = "row_num") %>%
-  ggplot() +
-  geom_line(
-    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.3) +
-  geom_line(aes(x = date, y = sp500.x),
-             size = 0.5, col = custom_colors[4]) +
-  labs(title = "Conditional variable: SP500", col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the SP500",
-       subtitle = paste0("The conditional values corresponding to the residual
-                         of the prior day are drawn in ",
-                     "<span style='color:",
-                     custom_colors[4],
-                     "'>**violet**</span>",
-                     ".")) 
-```
 
-The slight delay of the conditional values is clearly visible.
 
 ```{r cond1_euro_20_quantiles}
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_20_21 %>%
               mutate(row_num = 1:nrow(msci_spain_20_21)),
@@ -1066,29 +1119,6 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
        x = "estimation window (2021)", y = "log returns of the Eurostoxx 50")
 ```
 
-
-```{r cond1_euro_20_priorresid}
-risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = "prior_resid",
-               alpha = 0.05, exceeded = TRUE) %>%
-  left_join(msci_spain_20_21 %>%
-              mutate(row_num = 1:nrow(msci_spain_20_21)),
-            by = "row_num") %>%
-  ggplot() +
-  geom_line(
-    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.4) +
-  geom_line(aes(x = date, y = eurostoxx50.x),
-             size = 0.5, col = custom_colors[4]) +
-  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50",
-       subtitle = paste0("The conditional values corresponding to the residual
-                         of the prior day are drawn in ",
-                     "<span style='color:",
-                     custom_colors[4],
-                     "'>**violet**</span>",
-                     "."))
-```
-
 Again the same patterns as before are visible.
 
 ### The conditional risk measure estimates
@@ -1100,7 +1130,7 @@ As before one starts with the first time frame and the conditioning on the SP500
 
 ```{r cond1_rm_sp500_16_quantiles}
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -1117,20 +1147,12 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
 
 As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. 
 
-```{r cond1_sp500_16_quantileheat}
-cond_backtest_heatmap(cond_risk_roll_16_19_sp500,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond_risk_roll_16_19_sp500,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
-
 
 Now the risk measures based on the prior residuals.
 
 ```{r cond1_rm_sp500_16_priorresid}
-risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
+risk_estimates(cond_risk_roll_16_19_sp500_prior_resid,
+               risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
@@ -1152,32 +1174,13 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                      ".<br>Conditional variable: SP500"))
 ```
 
-The risk estimation looks quite good one could at this point facilitate a traditional backtest and then also a adequately chosen comparative backtest with the unconditional approach.
 
-```{r}
-get_traditional_backtests_cond(cond_risk_roll_16_19_sp500,
-                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
-  mutate(across(starts_with("alpha"), round, digits = 4))
-```
-
-These risk measures actually perform quite good and pass all traditional backtests, as the influence of the conditional variable is almost not there one expects the results of this conditional approach to be similar to the unconditional one. But as one opposes certain additional constraints like the position of the market index in the D-vine and the D-vine itself one might expect to see the unconditional model to be more flexible and therefore better in this situation. Thus one can move on to the comparative backtest.
-
-```{r}
-es_cond_comparative_backtest(
-  cond_risk_roll_16_19_sp500,
-  uncond_risk_roll_16_19_g50_k25_p250,
-  0.025,
-  "prior_resid"
-)
-```
-
-Again one can not make a definitive decision at the 5% significance level but the result clearly indicates a better model fit for the unconditional one.
 
 Next up is the much more influential market index Eurostoxx 50.
 
 ```{r cond1_rm_euro_16_quantiles}
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -1192,22 +1195,14 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
 ```
 
-Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures. This means that one has to cover the case of a bad European market situation in stress testing scenarios. This is also supported by the plot below that shows that one can only observe passing traditional backtests when one adjusts for low quantile i.e. a bad European market situation.
-
-```{r cond1_euro_16_quantileheat}
-cond_backtest_heatmap(cond_risk_roll_16_19_eurostoxx50,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond_risk_roll_16_19_eurostoxx50,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
+Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures. This means that one has to cover the case of a bad European market situation in stress testing scenarios.
 
 
 Now the risk measures based on the prior residuals.
 
 ```{r cond1_rm_euro_16_priorresid}
-risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
+risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid,
+               risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
@@ -1232,8 +1227,8 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
 At the first glance this additional conditional variable seems to be very close to the actual realized portfolio returns which might be highly desirable. Yet a look at the traditional backtests might uncover that the risk measures are too close to the realized returns. Moreover in this setting a comparative backtest is not fair as the `prior_resid` strategy uses for the simulation the data from the prior day while the unconditional model does only use forecasted quantities for a whole marginal window.
 
 ```{r}
-get_traditional_backtests_cond(cond_risk_roll_16_19_eurostoxx50,
-                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
+get_traditional_backtests_cond(cond_risk_roll_16_19_eurostoxx50_prior_resid,
+                               c(0.01, 0.025, 0.05), "prior_resid") %>%
   mutate(across(starts_with("alpha"), round, digits = 4))
 ```
 
@@ -1243,7 +1238,7 @@ Next one has a look at the second time frame. The conditional index SP500 is aga
 
 ```{r cond1_rm_sp500_20_quantiles}
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_20_21 %>%
               mutate(row_num = 1:nrow(msci_spain_20_21)),
@@ -1258,49 +1253,15 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
 ```
 
-```{r cond1_sp500_20_quantileheat}
-cond_backtest_heatmap(cond_risk_roll_20_21_sp500,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond_risk_roll_20_21_sp500,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
 
-```{r cond1_rm_sp500_20_priorresid}
-risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
-               cond_u = "prior_resid",
-               alpha = 0.025, exceeded = TRUE) %>%
-  left_join(msci_spain_20_21 %>%
-              mutate(row_num = 1:nrow(msci_spain_20_21)),
-            by = "row_num") %>%
-  ggplot() +
-  geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
-  geom_line(aes(x = date, y = risk_est),
-             size = 0.5, col = custom_colors[4]) +
-  labs(title = "Prior residual based conditional Expected Shortfall",
-       col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = paste0("The conditional
-                         Expected Shortfall at level 2.5% is drawn in ",
-                     "<span style='color:",
-                     custom_colors[4],
-                     "'>**violet**</span>",
-                     ".<br>Conditional variable: SP500"))
-```
 
-Again here probably due to the low influence of the SP500 the risk measure is quite similar to the unconditional one. This is also backed by the results of the traditional backtests of the prior residual startegy that even indicate a quite conservative estimation as some two sided hypotheses have to be rejected because of the conservative nature. At the 1%  level there where no VaR exceedances thus the exceedance residual backtest could not even be tested.
 
-```{r}
-get_traditional_backtests_cond(cond_risk_roll_20_21_sp500,
-                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
-  mutate(across(starts_with("alpha"), round, digits = 4))
-```
+Again here probably due to the low influence of the SP500 the risk measure is quite similar to the unconditional one.
+
 
 ```{r cond1_rm_euro_20_quantiles}
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_20_21 %>%
               mutate(row_num = 1:nrow(msci_spain_20_21)),
@@ -1315,50 +1276,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
        subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
 ```
 
-```{r cond1_euro_20_quantileheat}
-cond_backtest_heatmap(cond_risk_roll_20_21_eurostoxx50,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond_risk_roll_20_21_eurostoxx50,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
 
-Interestingly one can detect that for higher levels of the conditional Eurostoxx 50 asset than for the first time frame one can pass the traditional backtests. This suggests that in this high volatility situation the influence of the conditional asset diminishes slightly.
-
-```{r cond1_rm_euro_20_priorresid}
-risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
-               cond_u = "prior_resid",
-               alpha = 0.025, exceeded = TRUE) %>%
-  left_join(msci_spain_20_21 %>%
-              mutate(row_num = 1:nrow(msci_spain_20_21)),
-            by = "row_num") %>%
-  ggplot() +
-  geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
-  geom_line(aes(x = date, y = risk_est),
-             size = 0.5, col = custom_colors[4]) +
-  labs(title = "Prior residual based conditional Expected Shortfall",
-       col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = paste0("The conditional
-                         Expected Shortfall at level 2.5% is drawn in ",
-                     "<span style='color:",
-                     custom_colors[4],
-                     "'>**violet**</span>",
-                     ".<br>Conditional variable: Eurostoxx 50"))
-```
-
-
-
-
-Again to many violations can be seen here and the exaggeration of drops is clearly visible here. This is also reflected in the results of the traditional backtests below where only 1 of them is slightly passed.
-
-```{r}
-get_traditional_backtests_cond(cond_risk_roll_20_21_eurostoxx50,
-                                 c(0.01, 0.025, 0.05), "prior_resid") %>%
-  mutate(across(starts_with("alpha"), round, digits = 4))
-```
 
 All in all the strategy based on the quantiles is much more promising. As further research one could try to truncate the prior day residuals for example with the function $f(z) = max(0,z)$. But this could of course lead to too conservative estimates. 
 
@@ -1389,33 +1307,33 @@ One starts with the first time frame.
 
 ```{r dvines_cond2_16, fig.width=14, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[1]])
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[3]])
 labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[6]])
-labeled_vinecop_plot(fitted_vines(cond2_risk_roll_16_19)[[12]])
 ```
 
-In the further vine windows the bivariate relationship between the two conditional assets is even the independence copula.
+
 
 ```{r}
 bicops_used(fitted_vines(cond2_risk_roll_16_19)[[1]])
+bicops_used(fitted_vines(cond2_risk_roll_16_19)[[3]])
 bicops_used(fitted_vines(cond2_risk_roll_16_19)[[6]])
-bicops_used(fitted_vines(cond2_risk_roll_16_19)[[12]])
 ```
 
 Now the second time frame.
 
 ```{r dvines_cond2_20, fig.width=14, fig.height=8}
 labeled_vinecop_plot(fitted_vines(cond2_risk_roll_20_21)[[1]])
-labeled_vinecop_plot(fitted_vines(cond2_risk_roll_20_21)[[4]])
+labeled_vinecop_plot(fitted_vines(cond2_risk_roll_20_21)[[2]])
 ```
 
-In the vines the bivariate relationship between the two conditional assets is again modelled by the independence copula.
+
 
 ```{r}
 bicops_used(fitted_vines(cond2_risk_roll_20_21)[[1]])
-bicops_used(fitted_vines(cond2_risk_roll_20_21)[[4]])
+bicops_used(fitted_vines(cond2_risk_roll_20_21)[[2]])
 ```
 
-Similarly to the single conditional and unconditional case one can observe more copulas that stress tail dependence for the second time frame. From these results one would expect the double conditional risk measures to behave like the single conditional ones conditioned on the Eurostoxx 50 index.
+Similarly to the single conditional and unconditional case one can observe more copulas that stress tail dependence for the second time frame. 
 
 ### The conditional risk measure estimates
 
@@ -1423,7 +1341,7 @@ First goes the first time frame and indeed the expectations are met.
 
 ```{r cond2_rm_16_quantiles}
 risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
@@ -1435,24 +1353,16 @@ risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
              size = 0.5) +
   labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, SP500")
+       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola")
 ```
 
-```{r cond2_euro_16_quantileheat}
-cond_backtest_heatmap(cond2_risk_roll_16_19,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond2_risk_roll_16_19,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
 
 
 Same goes for the second time frame.
 
 ```{r cond2_rm_20_quantiles}
 risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
-               cond_u = seq(0.1, 0.9, 0.1),
+               cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
   left_join(msci_spain_20_21 %>%
               mutate(row_num = 1:nrow(msci_spain_20_21)),
@@ -1464,17 +1374,10 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
              size = 0.5) +
   labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, SP500")
+       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola")
 ```
 
-```{r cond2_euro_20_quantileheat}
-cond_backtest_heatmap(cond2_risk_roll_20_21,
-                      0.025,
-                      seq(0.1,0.9, 0.1))
-cond_backtest_heatmap(cond2_risk_roll_20_21,
-                      0.05,
-                      seq(0.1,0.9, 0.1))
-```
+
 
 
 
