@@ -984,6 +984,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
     aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
   geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
+  scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Conditional variable: SP500", col = "Quantile level",
        x = "estimation window", y = "log returns of the SP500")
 ```
@@ -1058,6 +1059,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
     aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
   geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
+  scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
        x = "estimation window", y = "log returns of the Eurostoxx 50")
 ```
@@ -1104,6 +1106,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
     aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
   geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
+  scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Conditional variable: SP500", col = "Quantile level",
        x = "estimation window (2021)", y = "log returns of the SP500")
 ```
@@ -1122,6 +1125,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
     aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
   geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
+  scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
        x = "estimation window (2021)", y = "log returns of the Eurostoxx 50")
 ```

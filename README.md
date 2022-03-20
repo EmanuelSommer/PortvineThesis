@@ -14,7 +14,7 @@ working on this project can be found
 [**HERE**](https://emanuelsommer.github.io/portvine/).
 <a href='https://github.com/EmanuelSommer/portvine'><img src='logo.png' align="right" width="20%" /></a>
 
-<br><br><br>
+<br><br><br><br>
 
 The repo is structured as follows:
 
