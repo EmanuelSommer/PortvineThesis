@@ -175,6 +175,21 @@ bicops_used <- function(vine) {
   table(unlist(vine$pair_copulas)[names(unlist(vine$pair_copulas)) == "family"])
 }
 
+# utility to get the copula famlies with their kendalls tau for the copulas
+# that are directly associated with the conditional asset i.e. the rightmost
+# bicop of of every tree level.
+index_copulas <- function(vine) {
+  n_trees <- length(vine$pair_copulas)
+  res <- data.frame("Tree" = seq(n_trees),
+                    "Copula_familiy" = "",
+                    "Kendalls_tau" = 0)
+  for (i in seq(n_trees)) {
+    res[i, 2] <- vine$pair_copulas[[i]][[1]]$family
+    res[i, 3] <- rvinecopulib::par_to_ktau(vine$pair_copulas[[i]][[1]])
+  }
+  res
+}
+
 
 
 
