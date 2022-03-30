@@ -415,15 +415,16 @@ Again looks good besides some too conservative estimates at the lowest alpha lev
 
 Visual comparison of the VaR and ES for one risk roll specification of the first time frame.
 
-```{r risk_comparison_es_var_16}
+```{r risk_comparison_es_var_16, fig.width=8, fig.height=6}
 risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01) %>%
+               c(alpha = 0.01, 0.05)) %>%
   left_join(msci_spain_16_19 %>%
               mutate(row_num = 1:nrow(msci_spain_16_19)),
             by = "row_num") %>%
-  mutate(risk_measure = if_else(
-    risk_measure == "ES_mean", "ES", risk_measure)
+  mutate(
+    risk_measure = if_else(risk_measure == "ES_mean", "ES", risk_measure),
+    alpha = paste("alpha:", alpha)
   ) %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
@@ -432,42 +433,25 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
             size = 0.5) +
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Risk measure",
-       title = "Comparison of risk measure behaivior for alpha level 0.01") +
+       title = "Comparison of risk measure behavior") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
-                     name = "Risk measure") 
-
-risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
-               risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.05) %>%
-  left_join(msci_spain_16_19 %>%
-              mutate(row_num = 1:nrow(msci_spain_16_19)),
-            by = "row_num") %>%
-  mutate(risk_measure = if_else(
-    risk_measure == "ES_mean", "ES", risk_measure)
-  ) %>%
-  ggplot() +
-  geom_line(aes(x = date, y = realized), col = "lightgrey") +
-  geom_line(aes(x = date, y = risk_est,
-                col = risk_measure, linetype = risk_measure),
-            size = 0.5) +
-  labs(x = "estimation window", y = "portfolio log returns",
-       linetype = "Risk measure",
-       title = "Comparison of risk measure behaivior for alpha level 0.05") +
-  scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
-                     name = "Risk measure") 
+                     name = "Risk measure") +
+  facet_wrap(~alpha, labeller = label_parsed) +
+  theme(legend.position = "bottom")
 ```
 
 As always now the second time frame.
 
-```{r risk_comparison_es_var_20}
+```{r risk_comparison_es_var_20, fig.width=8, fig.height=6}
 risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
                risk_measures = c("ES_mean", "VaR"),
-               alpha = 0.01) %>%
-  left_join(msci_spain_16_19 %>%
-              mutate(row_num = 1:nrow(msci_spain_16_19)),
+               c(alpha = 0.01, 0.05)) %>%
+  left_join(msci_spain_20_21 %>%
+              mutate(row_num = 1:nrow(msci_spain_20_21)),
             by = "row_num") %>%
-  mutate(risk_measure = if_else(
-    risk_measure == "ES_mean", "ES", risk_measure)
+  mutate(
+    risk_measure = if_else(risk_measure == "ES_mean", "ES", risk_measure),
+    alpha = paste("alpha:", alpha)
   ) %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
@@ -476,9 +460,11 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
             size = 0.5) +
   labs(x = "estimation window (2021)", y = "portfolio log returns",
        linetype = "Risk measure",
-       title = "Comparison of risk measure behaivior for alpha level 0.01") +
+       title = "Comparison of risk measure behavior") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
-                     name = "Risk measure") 
+                     name = "Risk measure") +
+  facet_wrap(~alpha, labeller = label_parsed) +
+  theme(legend.position = "bottom")
 ```
 
 These plots also suggest empirically that the assumption of colinearity of the ES and VaR that is used in the ESR backtesting seems reasonable.
