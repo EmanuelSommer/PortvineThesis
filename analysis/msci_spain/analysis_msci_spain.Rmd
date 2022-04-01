@@ -124,6 +124,15 @@ msci_spain_complete_data %>%
   geom_line() +
   labs(x = "", y = "Daily log returns") +
   facet_wrap(~name, ncol = 2)
+msci_spain_complete_data %>%
+  select(-sp500, -msci_spain_index) %>%
+  pivot_longer(-date) %>%
+  mutate(name = str_to_title(str_replace_all(name, "_", " ")),
+         name = fct_inorder(name)) %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_line() +
+  labs(x = "", y = "Daily log returns") +
+  facet_wrap(~name, ncol = 2)
 ```
 
 
@@ -137,6 +146,7 @@ In the unconditional case one allows for the general class of R-vine copulas and
 # load the unconditional models
 load(here::here("data", "msci_spain_uncond_res.RData"))
 load(here::here("data", "msci_spain_uncond_gausst.RData"))
+load(here::here("data", "msci_spain_uncond_dvines.RData"))
 ```
 
 
@@ -427,12 +437,17 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
     alpha = paste("alpha:", alpha)
   ) %>%
   ggplot() +
-  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = realized), col = "grey") +
   geom_line(aes(x = date, y = risk_est,
                 col = risk_measure, linetype = risk_measure),
             size = 0.5) +
   labs(x = "estimation window", y = "portfolio log returns",
        linetype = "Risk measure",
+       subtitle = paste0("The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     "."),
        title = "Comparison of risk measure behavior") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
                      name = "Risk measure") +
@@ -454,12 +469,17 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
     alpha = paste("alpha:", alpha)
   ) %>%
   ggplot() +
-  geom_line(aes(x = date, y = realized), col = "lightgrey") +
+  geom_line(aes(x = date, y = realized), col = "grey") +
   geom_line(aes(x = date, y = risk_est,
                 col = risk_measure, linetype = risk_measure),
             size = 0.5) +
   labs(x = "estimation window (2021)", y = "portfolio log returns",
        linetype = "Risk measure",
+       subtitle = paste0("The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     "."),
        title = "Comparison of risk measure behavior") +
   scale_color_manual(values = c(custom_colors[1], custom_colors[3]),
                      name = "Risk measure") +
@@ -482,13 +502,19 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
             by = "row_num") %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
-  geom_line(aes(x = date, y = risk_est), col = custom_colors[1]) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[3]) +
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
+       subtitle = paste0(
+                     "The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     ".<br>",
+                     "Exceedances are highlighted in ",
                      "<span style='color:",
                      custom_colors[2],
                      "'>**red**</span>",
@@ -507,13 +533,19 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
             by = "row_num") %>%
   ggplot() +
   geom_line(aes(x = date, y = realized), col = "lightgrey") +
-  geom_line(aes(x = date, y = risk_est), col = custom_colors[1]) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[3]) +
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
   labs(x = "estimation window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
-       subtitle = paste0("Exceedances are highlighted in ",
+       subtitle = paste0(
+                     "The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     ".<br>",
+                     "Exceedances are highlighted in ",
                      "<span style='color:",
                      custom_colors[2],
                      "'>**red**</span>",
@@ -523,7 +555,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
   theme(legend.position = "none")
 ```
 
-For the visualization of the ES it is reasonable to not mark the exceedances of the ES but again the ones of the corresponding VaR which is more natural given the definition of the ES. An example is given below.
+For the visualization of the ES it is reasonable to not mark the exceedances of the ES but again the ones of the corresponding VaR which is more natural given the definition of the ES. Examples are given below.
 
 ```{r es_exceedance_16}
 # first time frame
@@ -545,11 +577,87 @@ risk_estimates(uncond_risk_roll_16_19_g50_k25_p250,
   labs(x = "estimation window",
        y = "portfolio log returns",
        col = "Exceeded",
-       subtitle = paste0("Exceedances of the VaR are highlighted in ",
+       subtitle = paste0(
+                     "The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     ".<br>",
+                     "Exceedances of the VaR are highlighted in ",
                      "<span style='color:",
                      custom_colors[2],
                      "'>**red**</span>",
                      "."),
+       title = "Risk measure: ES with alpha level 0.025"
+       ) +
+  theme(legend.position = "none")
+
+# second time frame and final spec (for the FED talk)
+risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.025,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0(
+                     "The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     ".<br>",
+                     "Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     ".",
+                     "<br>Dependence model: R-vine"),
+       title = "Risk measure: ES with alpha level 0.025"
+       ) +
+  theme(legend.position = "none")
+
+# second time frame and D-vine based (for the FED talk)
+risk_estimates(uncond_risk_roll_20_21_dvine,
+               risk_measures = c("ES_mean", "VaR"),
+               alpha = 0.025,
+               exceeded = TRUE) %>%
+  left_join(msci_spain_16_19 %>%
+              mutate(row_num = 1:nrow(msci_spain_16_19)),
+            by = "row_num") %>%
+  ggplot() +
+  geom_line(aes(x = date, y = realized), col = "lightgrey",
+            data = . %>% filter(risk_measure == "VaR")) +
+  geom_line(aes(x = date, y = risk_est), col = custom_colors[1],
+            data = . %>% filter(risk_measure == "ES_mean")) +
+  geom_point(aes(x = date, y = realized), col = custom_colors[2], 
+             inherit.aes = FALSE,
+             data = . %>% filter(exceeded & risk_measure == "VaR")) +
+  labs(x = "estimation window",
+       y = "portfolio log returns",
+       col = "Exceeded",
+       subtitle = paste0(
+                     "The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "grey",
+                     "'>**grey**</span>",
+                     ".<br>",
+                     "Exceedances of the VaR are highlighted in ",
+                     "<span style='color:",
+                     custom_colors[2],
+                     "'>**red**</span>",
+                     ".",
+                     "<br>Dependence model: D-vine"),
        title = "Risk measure: ES with alpha level 0.025"
        ) +
   theme(legend.position = "none")
@@ -818,7 +926,6 @@ load(here::here("data", "msci_spain_cond1_1619sp500.RData"))
 load(here::here("data", "msci_spain_cond1_1619euro_prior_resid.RData"))
 load(here::here("data", "msci_spain_cond1_1619sp500_prior_resid.RData"))
 load(here::here("data", "msci_spain_cond1_2021.RData"))
-load(here::here("data", "msci_spain_uncond_dvines.RData"))
 ```
 
 Look at the fitted models for the first time frame.
@@ -967,12 +1074,18 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = sp500.y), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Conditional variable: SP500", col = "Quantile level",
-       x = "estimation window", y = "log returns of the SP500")
+  labs(title = "Quantile based **conditioning values** of the SP500",
+       col = "Quantile level",
+       x = "estimation window", y = "log returns of the SP500",
+       subtitle = paste0("The realized log returns of the SP500 are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 This is exactly the anticipated behavior. Using a small quantile level $\alpha^I$ like 0.1 resembles a really bad situation in the American market. The conditional values based on the prior residuals closely mitigate/ forecast the true behavior of the conditional asset as can be seen below. A slight delay and some exaggerations are clearly visible.
@@ -1016,14 +1129,14 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
   geom_line(
     aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
   geom_line(aes(x = date, y = sp500.x),
-             size = 0.5, col = custom_colors[4]) +
+             size = 0.5, col = "#37d925") +
   labs(title = "Conditional variable: SP500", col = "Quantile level",
        x = "estimation window", y = "log returns of the SP500",
        subtitle = paste0("The conditional values corresponding to the realized 
                          residual are drawn in ",
                      "<span style='color:",
-                     custom_colors[4],
-                     "'>**violet**</span>",
+                     "#37d925",
+                     "'>**green**</span>",
                      ".")) +
   theme_light() +
   ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
@@ -1042,12 +1155,19 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = eurostoxx50.y), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
-       x = "estimation window", y = "log returns of the Eurostoxx 50")
+  labs(title = "Quantile based **conditioning values** of the Eurostoxx 50",
+       col = "Quantile level",
+       x = "estimation window", y = "log returns of the Eurostoxx 50",
+       subtitle = paste0("The realized log returns of the Eurostoxx 50
+                         are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 The same pattern as for the other conditional asset is visible. The index however seems to have more extreme market situations.
@@ -1089,12 +1209,18 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = sp500.y), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = sp500.y), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = sp500.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Conditional variable: SP500", col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the SP500")
+  labs(title = "Quantile based **conditioning values** of the SP500",
+       col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the SP500",
+       subtitle = paste0("The realized log returns of the SP500 are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 
@@ -1108,12 +1234,19 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = eurostoxx50.y), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = eurostoxx50.y), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = eurostoxx50.x, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Conditional variable: Eurostoxx 50", col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50")
+  labs(title = "Quantile based **conditioning values** of the Eurostoxx 50",
+       col = "Quantile level",
+       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50",
+       subtitle = paste0("The realized log returns of the Eurostoxx 50 are
+                         given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 Again the same patterns as before are visible.
@@ -1126,6 +1259,7 @@ As before one starts with the first time frame and the conditioning on the SP500
 
 
 ```{r cond1_rm_sp500_16_quantiles}
+# raw 
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1134,14 +1268,23 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
+# realized residuals
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1150,7 +1293,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1162,15 +1305,25 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 
+# dvine based
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1179,7 +1332,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1190,15 +1343,24 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#fca103"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       unconditional D-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+        unconditional D-vine based ES estimates are drawn in 
+        <span style='color:#fca103'>**orange**</span>."))
 
+# rvine based
 risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1207,7 +1369,7 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1218,14 +1380,21 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#e6db00"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       unconditional R-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>", "The
+         unconditional R-vine based ES estimates are drawn in 
+         <span style='color:#e6db00'>**gold**</span>."))
 ```
 
 As expected the risk measures seems to be very robust to changes in the American market. This is most likely a consequence of the very small dependency modeled in the D-vine. 
@@ -1262,6 +1431,7 @@ risk_estimates(cond_risk_roll_16_19_sp500_prior_resid,
 Next up is the much more influential market index Eurostoxx 50.
 
 ```{r cond1_rm_euro_16_quantiles}
+# raw
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1270,14 +1440,23 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
+# realized residuals
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1286,7 +1465,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1298,15 +1477,25 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 
+# dvine based
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1315,7 +1504,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1326,15 +1515,24 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#fca103"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       unconditional D-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+        unconditional D-vine based ES estimates are drawn in 
+        <span style='color:#fca103'>**orange**</span>."))
 
+# rvine based
 risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1343,7 +1541,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1354,14 +1552,21 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#e6db00"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       unconditional R-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>", "The
+         unconditional R-vine based ES estimates are drawn in 
+         <span style='color:#e6db00'>**gold**</span>."))
 ```
 
 Here contrary to the case before one can detect a strong influence of the conditional quantile level on the final risk measures. This means that one has to cover the case of a bad European market situation in stress testing scenarios.
@@ -1410,6 +1615,7 @@ As expected from the plot the risk measures are not at all conservative enough a
 Next one has a look at the second time frame. The conditional index SP500 is again the first one to be analysed.
 
 ```{r cond1_rm_sp500_20_quantiles}
+# raw
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1418,14 +1624,23 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
+# realized residuals
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1434,7 +1649,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1446,15 +1661,25 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 
+# dvine based
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1463,7 +1688,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1474,15 +1699,24 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#fca103"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       unconditional D-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+        unconditional D-vine based ES estimates are drawn in 
+        <span style='color:#fca103'>**orange**</span>."))
 
+# rvine based
 risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1491,7 +1725,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1502,14 +1736,21 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#e6db00"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: SP500<br>The
-       unconditional R-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>", "The
+         unconditional R-vine based ES estimates are drawn in 
+         <span style='color:#e6db00'>**gold**</span>."))
 ```
 
 
@@ -1519,6 +1760,7 @@ Again here probably due to the low influence of the SP500 the risk measure is qu
 
 
 ```{r cond1_rm_euro_20_quantiles}
+# raw
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1527,14 +1769,23 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
+# realized residuals
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1543,7 +1794,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1555,15 +1806,25 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 
+# dvine based
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1572,7 +1833,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1583,15 +1844,24 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#fca103"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       unconditional D-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+        unconditional D-vine based ES estimates are drawn in 
+        <span style='color:#fca103'>**orange**</span>."))
 
+# rvine based
 risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
                alpha = 0.025, exceeded = TRUE) %>%
@@ -1600,7 +1870,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1611,14 +1881,21 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#e6db00"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
-  labs(title = "Quantile based conditional Expected Shortfall", col = "Quantile level",
+  labs(title = "Quantile based conditional Expected Shortfall",
+       col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>The
-       unconditional R-vine based ES estimates are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>", "The
+         unconditional R-vine based ES estimates are drawn in 
+         <span style='color:#e6db00'>**gold**</span>."))
 ```
 
 
@@ -1693,15 +1970,21 @@ risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50,
-       Iberdrola")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
 risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
@@ -1723,16 +2006,24 @@ risk_estimates(cond2_risk_roll_16_19, risk_measures = "ES_mean",
               left_join(msci_spain_16_19 %>%
                 mutate(row_num = 1:nrow(msci_spain_16_19)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
        x = "estimation window", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50,
-       Iberdrola<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola
+         <br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 ```
 
 
@@ -1748,15 +2039,21 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50,
-       Iberdrola")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola",
+         "<br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         "."))
 
 risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
                cond_u = c(0.05, 0.1, 0.25, 0.5),
@@ -1766,7 +2063,7 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est, col = fct_rev(factor(cond_u))),
              size = 0.5) +
   geom_line(aes(x = date, y = risk_est),
@@ -1778,16 +2075,24 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
               left_join(msci_spain_20_21 %>%
                 mutate(row_num = 1:nrow(msci_spain_20_21)),
               by = "row_num"),
-            col = "#ff2edd"
+            col = "#37d925"
             ) +
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
        x = "estimation window (2021)", y = "portfolio log returns",
-       subtitle = "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50,
-       Iberdrola<br>The
-       ES estimates conditioned on the **realized residuals** are drawn in 
-       <span style='color:#ff2edd'>**pink**</span>.")
+       subtitle = paste0(
+         "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola
+         <br>",
+         "The realized portfolio log returns are given in ",
+         "<span style='color:",
+         "#828282",
+         "'>**grey**</span>",
+         ".", "<br>",
+         "The
+         ES estimates conditioned on the **realized residuals** are drawn in 
+         <span style='color:#37d925'>**green**</span>."
+         ))
 ```
 
 
