@@ -608,7 +608,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window",
+  labs(x = "estimation window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0(
@@ -643,7 +643,7 @@ risk_estimates(uncond_risk_roll_20_21_dvine,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window",
+  labs(x = "estimation window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0(
