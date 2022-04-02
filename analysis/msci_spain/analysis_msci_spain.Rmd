@@ -1109,6 +1109,11 @@ risk_estimates(cond_risk_roll_16_19_sp500_prior_resid, risk_measures = "ES_mean"
                      "<span style='color:",
                      custom_colors[4],
                      "'>**violet**</span>",
+                     ".",
+                     "<br>The realized log returns of the SP500 are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
                      ".")) +
   theme_light() +
   ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
@@ -1137,6 +1142,11 @@ risk_estimates(cond_risk_roll_16_19_sp500, risk_measures = "ES_mean",
                      "<span style='color:",
                      "#37d925",
                      "'>**green**</span>",
+                     ".",
+                     "<br>The realized log returns of the SP500 are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
                      ".")) +
   theme_light() +
   ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
@@ -1173,7 +1183,8 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50, risk_measures = "ES_mean",
 The same pattern as for the other conditional asset is visible. The index however seems to have more extreme market situations.
 
 ```{r cond1_euro_16_priorresid}
-risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid, risk_measures = "ES_mean",
+risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid,
+               risk_measures = "ES_mean",
                cond_u = "prior_resid",
                alpha = 0.05, exceeded = TRUE) %>%
   left_join(msci_spain_16_19 %>%
@@ -1191,6 +1202,12 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid, risk_measures = "ES
                      "<span style='color:",
                      custom_colors[4],
                      "'>**violet**</span>",
+                     ".",
+                     "<br>The realized log returns of the Eurostoxx 50
+                     are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
                      ".")) +
   theme_light() +
   ggforce::facet_zoom(x = date >= as.Date("2019-03-01") & date <= as.Date("2019-04-01")) +
@@ -1412,7 +1429,7 @@ risk_estimates(cond_risk_roll_16_19_sp500_prior_resid,
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est),
              size = 0.5, col = custom_colors[4]) +
   labs(title = "Prior residual based conditional Expected Shortfall",
@@ -1423,7 +1440,12 @@ risk_estimates(cond_risk_roll_16_19_sp500_prior_resid,
                      "<span style='color:",
                      custom_colors[4],
                      "'>**violet**</span>",
-                     ".<br>Conditional variable: SP500"))
+                     ".<br>Conditional variable: SP500",
+                     "<br>The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 
@@ -1584,7 +1606,7 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid,
             by = "row_num") %>%
   ggplot() +
   geom_line(
-    aes(x = date, y = realized), col = "black", size = .6, alpha = 0.5) +
+    aes(x = date, y = realized), col = "#828282", size = .6) +
   geom_line(aes(x = date, y = risk_est),
              size = 0.5, col = custom_colors[4]) +
   labs(title = "Prior residual based conditional Expected Shortfall",
@@ -1595,7 +1617,12 @@ risk_estimates(cond_risk_roll_16_19_eurostoxx50_prior_resid,
                      "<span style='color:",
                      custom_colors[4],
                      "'>**violet**</span>",
-                     ".<br>Conditional variable: Eurostoxx 50"))
+                     ".<br>Conditional variable: Eurostoxx 50",
+                     "<br>The realized portfolio log returns are given in ",
+                     "<span style='color:",
+                     "#828282",
+                     "'>**grey**</span>",
+                     "."))
 ```
 
 At the first glance this additional conditional variable seems to be very close to the actual realized portfolio returns which might be highly desirable. Yet a look at the traditional backtests might uncover that the risk measures are too close to the realized returns. Moreover in this setting a comparative backtest is not fair as the `prior_resid` strategy uses for the simulation the data from the prior day while the unconditional model does only use forecasted quantities for a whole marginal window.
