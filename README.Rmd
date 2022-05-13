@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 # Estimation and Backtesting of the Expected Shortfall and Value at Risk using Vine Copulas
 ### An unconditional and conditional rolling window approach
 
-This repository collects the code for all theoretical visualizations and case studies presented in my master thesis at the chair of Mathematical Statistics at the TUM with the title given above.
+This repository collects the code for all theoretical visualizations and case studies presented in [my master thesis](https://mediatum.ub.tum.de/1658240) at the chair of Mathematical Statistics at the TUM with the title given above.
 
 The heavily used `portvine` R package that I developed also while working on this project can be found [**HERE**](https://emanuelsommer.github.io/portvine/). 
 <a href='https://github.com/EmanuelSommer/portvine'><img src='logo.png' align="right" width="20%" /></a>

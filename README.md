@@ -6,7 +6,8 @@
 ### An unconditional and conditional rolling window approach
 
 This repository collects the code for all theoretical visualizations and
-case studies presented in my master thesis at the chair of Mathematical
+case studies presented in [my master
+thesis](https://mediatum.ub.tum.de/1658240) at the chair of Mathematical
 Statistics at the TUM with the title given above.
 
 The heavily used `portvine` R package that I developed also while
