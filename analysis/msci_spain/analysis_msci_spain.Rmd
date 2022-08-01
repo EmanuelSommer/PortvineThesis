@@ -11,7 +11,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache)
 ```
 
 In this analysis different portfolios consisting of stocks that are among the top 10 constituents of the MSCI Spain Index are backtested using the functionality of the `portvine` package. First the most important packages are loaded and after that the data will be imported and discussed shortly.
@@ -473,7 +473,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
   geom_line(aes(x = date, y = risk_est,
                 col = risk_measure, linetype = risk_measure),
             size = 0.5) +
-  labs(x = "estimation window (2021)", y = "portfolio log returns",
+  labs(x = "forecasting window (2021)", y = "portfolio log returns",
        linetype = "Risk measure",
        subtitle = paste0("The realized portfolio log returns are given in ",
                      "<span style='color:",
@@ -536,7 +536,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k25_p100,
   geom_line(aes(x = date, y = risk_est), col = custom_colors[3]) +
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE, data = . %>% filter(exceeded)) +
-  labs(x = "estimation window (2021)",
+  labs(x = "forecasting window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0(
@@ -608,7 +608,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window (2021)",
+  labs(x = "forecasting window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0(
@@ -643,7 +643,7 @@ risk_estimates(uncond_risk_roll_20_21_dvine,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window (2021)",
+  labs(x = "forecasting window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0(
@@ -869,7 +869,7 @@ risk_estimates(uncond_risk_roll_20_21_g50_k50_p200,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window (2021)",
+  labs(x = "forecasting window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances of the VaR are highlighted in ",
@@ -896,7 +896,7 @@ risk_estimates(uncond_risk_roll_20_21_t,
   geom_point(aes(x = date, y = realized), col = custom_colors[2], 
              inherit.aes = FALSE,
              data = . %>% filter(exceeded & risk_measure == "VaR")) +
-  labs(x = "estimation window (2021)",
+  labs(x = "forecasting window (2021)",
        y = "portfolio log returns",
        col = "Exceeded",
        subtitle = paste0("Exceedances of the VaR are highlighted in ",
@@ -1232,7 +1232,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based **conditioning values** of the SP500",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the SP500",
+       x = "forecasting window (2021)", y = "log returns of the SP500",
        subtitle = paste0("The realized log returns of the SP500 are given in ",
                      "<span style='color:",
                      "#828282",
@@ -1257,7 +1257,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based **conditioning values** of the Eurostoxx 50",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "log returns of the Eurostoxx 50",
+       x = "forecasting window (2021)", y = "log returns of the Eurostoxx 50",
        subtitle = paste0("The realized log returns of the Eurostoxx 50 are
                          given in ",
                      "<span style='color:",
@@ -1657,7 +1657,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: SP500",
          "<br>",
@@ -1693,7 +1693,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
          "The realized portfolio log returns are given in ",
@@ -1731,7 +1731,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
          "The realized portfolio log returns are given in ",
@@ -1768,7 +1768,7 @@ risk_estimates(cond_risk_roll_20_21_sp500, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: SP500<br>",
          "The realized portfolio log returns are given in ",
@@ -1802,7 +1802,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50",
          "<br>",
@@ -1838,7 +1838,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
          "The realized portfolio log returns are given in ",
@@ -1876,7 +1876,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
          "The realized portfolio log returns are given in ",
@@ -1913,7 +1913,7 @@ risk_estimates(cond_risk_roll_20_21_eurostoxx50, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variable: Eurostoxx 50<br>",
          "The realized portfolio log returns are given in ",
@@ -2072,7 +2072,7 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola",
          "<br>",
@@ -2107,7 +2107,7 @@ risk_estimates(cond2_risk_roll_20_21, risk_measures = "ES_mean",
   scale_color_manual(values = c("#75a9fa", "#2d76eb", "#3567b5", "#133975")) +
   labs(title = "Quantile based conditional Expected Shortfall",
        col = "Quantile level",
-       x = "estimation window (2021)", y = "portfolio log returns",
+       x = "forecasting window (2021)", y = "portfolio log returns",
        subtitle = paste0(
          "Alpha level: 2.5%<br>Conditional variables: Eurostoxx 50, Iberdrola
          <br>",
