@@ -492,3 +492,70 @@ cond_backtest_heatmap <- function(roll, alpha, cond_u) {
          title = "Traditional backtests on the conditional risk measures",
          subtitle = paste("Alpha level:", alpha))
 }
+
+
+
+#' Extract a filtered ugarch model from a uGARCHroll object
+#'
+#' The [`rugarch::ugarchroll`] class object encompasses fitting information
+#' about a number of
+#' models fitted in a rolling window fashion. This utility function gives an
+#' easy interface to extract the filtered ugarch model for a specified roll.
+#'
+#' @param ugarchroll Object of class [`rugarch::ugarchroll`].
+#' @param roll_num Count that specifies the fitted model to extract the
+#' residuals from.
+#'
+#' @return filtered ugarch model
+#' @export
+roll_filtered_model <- function(ugarchroll, roll_num = 1) {
+  checkmate::assert_class(ugarchroll, classes = "uGARCHroll")
+  total_roll_num <- ugarchroll@model$n.refits
+  checkmate::assert_integerish(roll_num,
+                               lower = 0, upper = total_roll_num,
+                               len = 1
+  )
+
+  train_end_index <- ugarchroll@model$n.start
+  refit_size <- ugarchroll@model$refit.every
+  distribution <- ugarchroll@model$spec@model$modeldesc$distribution
+  coefs <- ugarchroll@model$coef[[roll_num]]$coef[, 1]
+  spec <- rugarch::ugarchspec(
+    distribution.model = distribution,
+    fixed.pars = coefs,
+    variance.model = list(
+      model = ugarchroll@model$spec@model$modeldesc$vmodel,
+      garchOrder = c(
+        marginals$iberdrola@model$spec@model$modelinc[["alpha"]],
+        marginals$iberdrola@model$spec@model$modelinc[["beta"]]
+      ),
+      submodel = NULL,
+      external.regressors = NULL,
+      variance.targeting = FALSE
+    ),
+    mean.model = list(
+      armaOrder = c(
+        marginals$iberdrola@model$spec@model$modelinc[["ar"]],
+        marginals$iberdrola@model$spec@model$modelinc[["ma"]]
+      ),
+      include.mean = marginals$iberdrola@model$spec@model$modelinc[["mu"]] == 1,
+      archm = FALSE,
+      archpow = 1,
+      arfima = FALSE,
+      external.regressors = NULL,
+      archex = FALSE
+    )
+  )
+  filtered_model <- rugarch::ugarchfilter(
+    spec = spec,
+    data = ugarchroll@model$data[seq(
+      1 + refit_size * (roll_num - 1),
+      min(
+        refit_size * (roll_num - 1) +
+          train_end_index,
+        length(ugarchroll@model$data)
+      )
+    )]
+  )
+ filtered_model
+}

@@ -1,0 +1,380 @@
+---
+title: "PoC Simulation (unconditional)"
+author: "Emanuel Sommer"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    df_print: paged
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
+```
+
+In the following PoC Simulation Study we want to show that given the main assumptions of the approach we can estimate the risk measures correctly. We do this for the unconditional setting. As the conditional simulation from the D-vine is derived rigorously from the Rosenblatt transform and not an approximation the results from this simulation should translate very well to the conditional case.
+
+As a starting point we use data and fitted models from the analysis of Spanish stocks. So for details on the data and the models please have a look at the respective analysis folder and rmarkdown notebook.
+
+## Load the data & packages
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+# main workhorse for the estimation of risk measures
+library(portvine)
+# general data wrangling and visualizations
+library(tidyverse)
+# arrange ggplots nicely
+library(patchwork)
+# utility color vector for visualizations
+custom_colors <- c("#92B8DE", "#db4f59", "#477042", "#cc72d6")
+theme_set(
+  theme_minimal() +
+  theme(plot.title = ggtext::element_markdown(size = 11),
+        plot.subtitle = ggtext::element_markdown(size = 9))
+)
+Sys.setlocale("LC_TIME", "English")
+# load the data
+load(here::here("data", "msci_spain_data_clean.RData"))
+# source utils
+source(here::here("analysis_utils.R"))
+```
+
+```{r}
+# load the fitted unconditional models
+load(here::here("data", "msci_spain_uncond_res.RData"))
+```
+
+## Simulation setup
+
+### Marginal ground truths
+
+First we extract the marginal ARMA-GARCH models. Those fittet values are now considered our ground truth. This resembles the assumption that the marginal time series are learnable by ARMA-GARCH models. By using fitted values from ARMA-GARCH models we of course satisfy this assumption by construction. As a quick sanity check we plot the realized time series of log return on top of the fitted series with the raw residuals added on top. The difference which we also compute should be very close to zero.
+
+```{r}
+marginals <- fitted_marginals(uncond_risk_roll_16_19_g50_k25_p500)
+```
+
+
+
+```{r}
+msci_spain_16_19[1:750, ] %>%
+  mutate("iberdrola fitted+residuals" =
+           as.numeric(
+             rugarch::fitted(roll_filtered_model(marginals$iberdrola))
+            ) +
+           as.numeric(
+             rugarch::residuals(
+               roll_filtered_model(marginals$iberdrola),
+               standardize = FALSE)
+          )
+  ) %>%
+  select(date, iberdrola, `iberdrola fitted+residuals`) %>%
+  pivot_longer(-date) %>%
+  ggplot(aes(x = date, color = name, y = value)) +
+  geom_line(alpha = 0.5) +
+  scale_color_manual(values = custom_colors[c(3, 2)]) +
+  labs(y = "log returns of Iberdrola", y = "", color = "")
+
+msci_spain_16_19[1:750, ] %>%
+  mutate("iberdrola_fitted_and_residuals" =
+           rugarch::residuals(
+             roll_filtered_model(marginals$iberdrola),
+             standardize = FALSE
+            ) +
+           rugarch::fitted(roll_filtered_model(marginals$iberdrola))) %>%
+  mutate(abs_diff = abs(iberdrola - iberdrola_fitted_and_residuals)) %>%
+  pull(abs_diff) %>%
+  mean()
+```
+
+As we can see the sanity check is passed. As the next step we extract the ground truth series for each asset for our simulation.
+
+```{r}
+ground_truth_series <- msci_spain_16_19[1:750, 3:11]
+for (col in colnames(ground_truth_series)) {
+  ground_truth_series[col] <- rugarch::fitted(roll_filtered_model(marginals[[col]]))
+}
+```
+
+### Vine copula i.e. dependence ground truth
+
+As the ground truth for their dependence we take the fitted R-vine copula from the first rolling window. We assume the fitted vine to correctly represent the dependence between the assets. This corresponds to our assumption that the flexible class of vine copulas is able to capture the multivariate dependence between the assets appropriately. 
+
+```{r}
+ground_truth_vine <- fitted_vines(uncond_risk_roll_16_19_g50_k25_p500)[[1]]
+# visualize first tree
+labeled_vinecop_plot(ground_truth_vine)
+```
+
+
+
+
+### Simulation approach
+
+We first want to simulate $n = 1100$ portfolios from this ground truth. We achieve this with the following steps:
+
+- Simulate from the vine copula copula-scale residuals for each asset and each day
+- Transform the copula-scale residuals to standardized residuals by applying the inverse PIT with the learned residual distributions
+- Use the standardized residuals to retrieve the simulated return series by using the fitted mean and volatility estimates
+
+Having these series we split them into a training and validation window. We now estimate the to be assumed true ES based on the realized values of the series for each day of the validation set. Then we estimate the ES for each of the series using our method and analyze how well our approach compares to the true value. To have a better sample efficiency we have a look at the ES at level $\alpha = 0.1$ and for comparison also $\alpha = 0.05$. Moreover w.l.o.g. we assume an equal weighting for all assets.
+
+In the following we will use a training horizon of $730$ days and a validation horizon of $20$ days. 
+
+
+```{r, include=FALSE}
+ground_truth_series
+```
+
+
+### Simulation
+
+```{r}
+simulate_one_series <- function(ground_truth_portfolio, ground_truth_vine, marginals) {
+  copula_scale_resid <- rvinecopulib::rvinecop(750, ground_truth_vine)
+  res <- as.data.frame(copula_scale_resid)
+  # for each asset retrieve the marginal model and transform
+  for (col in colnames(ground_truth_portfolio)) {
+    # copula to standardized
+    marginal_model <- roll_filtered_model(marginals[[col]])
+    roll_distribution <- marginal_model@model$modeldesc$distribution
+    skew <- marginals[[col]]@model$coef[[1]]$coef[7, 1]
+    shape <- marginals[[col]]@model$coef[[1]]$coef[8, 1]
+    res[[col]] <- rugarch::qdist(
+      distribution = roll_distribution,
+      p = copula_scale_resid[, col],
+      skew = skew,
+      shape = shape
+    )
+    # standardized to original scale
+    res[[col]] <- ground_truth_portfolio[[col]] + (
+      marginal_model@filter$sigma * res[[col]]
+    )
+  }
+  
+  # estimate the ES at 10% for the simulated portfolio and record the ES estimates
+  risk_roll <- estimate_risk_roll(
+    data = res,
+    marginal_settings = marginal_settings(
+      train_size = 730,
+      refit_size = 10
+    ),
+    vine_settings = vine_settings(
+      train_size = 200,
+      refit_size = 10,
+      family_set = "parametric"
+    ),
+    alpha = c(0.05, 0.1),
+    risk_measures = "ES_mean",
+    n_samples = 1000,
+    trace = FALSE
+  )
+  risk_estimates <- risk_estimates(risk_roll, alpha = c(0.05, 0.1))
+  # return both the realized simulated portfolio values as well as the estimated ES estimates for the validation set
+  risk_estimates
+}
+```
+
+
+
+```{r, warning=FALSE, include=FALSE}
+test_simulation <- simulate_one_series(ground_truth_series, ground_truth_vine, marginals)
+test_simulation %>% filter(alpha == 0.05) %>% arrange(row_num) %>% pull(realized) %>% head()
+test_simulation %>% filter(alpha == 0.1) %>% arrange(row_num) %>% pull(risk_est) %>% length()
+```
+
+```{r, warning=FALSE, eval=FALSE}
+realized_returns <- matrix(nrow = 1100, ncol = 20)
+colnames(realized_returns) <- paste0("day_", 1:20)
+es_0.05_estimates <- realized_returns
+es_0.1_estimates <- realized_returns
+
+library(progress)
+pb <- progress_bar$new(
+  format = "  simulating with portvine [:bar] :current/:total (:percent) eta: :eta",
+  total = 1100, clear = FALSE
+)
+for (simulation_number in seq(1100)) {
+  pb$tick()
+  try({
+    simulation <- simulate_one_series(ground_truth_series, ground_truth_vine, marginals)
+    realized_returns[simulation_number, ] <- simulation %>%
+      filter(alpha == 0.05) %>% 
+      arrange(row_num) %>% 
+      pull(realized)
+    es_0.05_estimates[simulation_number, ] <- simulation %>%
+      filter(alpha == 0.05) %>% 
+      arrange(row_num) %>% 
+      pull(risk_est)
+    es_0.1_estimates[simulation_number, ] <- simulation %>%
+      filter(alpha == 0.1) %>% 
+      arrange(row_num) %>% 
+      pull(risk_est)
+  }, silent = TRUE)
+  
+  if ((simulation_number %% 50) == 0) {
+    save(
+      realized_returns, es_0.05_estimates, es_0.1_estimates,
+      file = here::here("data", "poc_uncond_simulation_exp3.RData")
+    )
+  }
+}
+
+save(
+  realized_returns, es_0.05_estimates, es_0.1_estimates,
+  file = here::here("data", "poc_uncond_simulation_exp3.RData")
+)
+```
+
+### Evaluation
+
+```{r}
+load(here::here("data", "poc_uncond_simulation_exp3.RData"))
+```
+
+Estimate the *true* ES first.
+
+```{r}
+true_es <- vapply(1:20, function(day) {
+  est_es(realized_returns[, day], alpha = c(0.1, 0.05))
+}, FUN.VALUE = numeric(2))
+rownames(true_es) <- c("alpha_0.1", "alpha_0.05")
+true_es
+```
+
+Distribution of the ES estimates for one day only.
+
+```{r}
+tibble(
+  true_es = true_es[2, 10],
+  estimated_es = es_0.05_estimates[, 10]
+) %>%
+  ggplot() +
+  geom_density(aes(x = estimated_es)) +
+  geom_vline(aes(xintercept = true_es))
+```
+
+```{r}
+# Have a look at the bias w.r.t. the mean of ES estimates
+bias_0.1 <- colMeans(es_0.1_estimates) - true_es[1, ]
+tibble(bias = bias_0.1) %>%
+  ggplot(aes(x = bias)) +
+  geom_density() +
+  geom_vline(xintercept = mean(bias_0.1), col = "blue") + 
+  geom_vline(xintercept = 0)
+bias_0.05 <- colMeans(es_0.05_estimates) - true_es[2, ]
+tibble(bias = bias_0.05) %>%
+  ggplot(aes(x = bias)) +
+  geom_density() +
+  geom_vline(xintercept = mean(bias_0.05), col = "blue") + 
+  geom_vline(xintercept = 0)
+# standard deviation for comparison
+sd(realized_returns)
+```
+
+
+
+```{r, message=FALSE}
+t(t(es_0.05_estimates) - true_es[2, ]) %>%
+  as_tibble() %>%
+  pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
+  mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+  group_by(day) %>%
+  mutate(p_value = pnorm(mean(bias), mean = 0, sd = sd(bias))) %>%
+  ggplot() +
+  ggridges::geom_density_ridges(
+    aes(x = bias, y = day, fill = day), col = "#383d47", na.rm = TRUE
+  ) +
+  geom_vline(xintercept = 0, linewidth = 1) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  guides(color = "none", fill = "none") +
+  xlim(-0.1, NA) +
+  labs(
+    x = "Bias w.r.t. the true ES", y = "Forecasted Day",
+    title = "Bias of distribution of the ES estimates at significance 0.05"
+  )
+
+t(t(es_0.1_estimates) - true_es[1, ]) %>%
+  as_tibble() %>%
+  pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
+  mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+  ggplot() +
+  ggridges::geom_density_ridges(
+    aes(x = bias, y = day, fill = day), col = "#383d47", na.rm = TRUE
+  ) +
+  geom_vline(xintercept = 0, linewidth = 1) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  guides(color = "none", fill = "none") +
+  xlim(-0.1, NA) +
+  labs(
+    x = "Bias w.r.t. the true ES", y = "Forecasted Day",
+    title = "Bias of distribution of the ES estimates at significance 0.1"
+  )
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+realized_returns %>%
+  as_tibble() %>%
+  pivot_longer(everything(), names_to = "day", values_to = "realized") %>%
+  mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+  bind_cols(
+    es_0.05_estimates %>%
+      as_tibble() %>%
+      pivot_longer(everything(), names_to = "day", values_to = "es") %>%
+      mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+      select("es")
+  ) %>%
+  pivot_longer(-day, names_to = "type", values_to = "values") %>%
+  ggplot() +
+  ggridges::geom_density_ridges(
+    aes(x = values, y = day, fill = type), col = "#383d47", na.rm = TRUE
+  ) +
+  scale_fill_manual(
+    name = "",
+    values = c("#587D53", "#7EA6E0"),
+    labels = c("ES estimates", "Realized")
+  ) +
+  xlim(-0.25, 0.25) +
+  labs(
+    x = "Log return scale", y = "Forecasted Day",
+    title = "Distributions of the ES estimates (alpha: 0.05) along the realized log returns"
+  )
+
+realized_returns %>%
+  as_tibble() %>%
+  pivot_longer(everything(), names_to = "day", values_to = "realized") %>%
+  mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+  bind_cols(
+    es_0.1_estimates %>%
+      as_tibble() %>%
+      pivot_longer(everything(), names_to = "day", values_to = "es") %>%
+      mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+      select("es")
+  ) %>%
+  pivot_longer(-day, names_to = "type", values_to = "values") %>%
+  ggplot() +
+  ggridges::geom_density_ridges(
+    aes(x = values, y = day, fill = type), col = "#383d47", na.rm = TRUE
+  ) +
+  scale_fill_manual(
+    name = "",
+    values = c("#587D53", "#7EA6E0"),
+    labels = c("ES estimates", "Realized")
+  ) +
+  xlim(-0.3, 0.3) +
+  labs(
+    x = "Log return scale", y = "Forecasted Day",
+    title = "Distributions of the ES estimates (alpha: 0.1) along the realized log returns"
+  )
+```
+
+
+
+We can observe that the estimation bias is almost always very close to 0. Moreover we can observe that the estimation quality does not degrade during this simulated forecasting window. This is indeed an encouraging result. Furthermore we do not seem to systematically under or overestimate the ES across all the days. This is good for both the regulators which are averse against systematic overestimation and the financial institutions which are avers against systematic underestimation as it means elevated capital requirements. This is however a proof of concept simulation study with clear limitations like only a small simulation number and thus especially the true ES that we are stating for comparison is only an estimation based on a rather small sample size. So all in all this PoC study did not uncover any obvious problems in the stated estimation approach and suggests that a large scale simulation study is the next step to take.
+
+

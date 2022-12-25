@@ -11,7 +11,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 ```
 
 In this analysis different portfolios consisting of stocks that are among the top 10 constituents of the MSCI Spain Index are backtested using the functionality of the `portvine` package. First the most important packages are loaded and after that the data will be imported and discussed shortly.
