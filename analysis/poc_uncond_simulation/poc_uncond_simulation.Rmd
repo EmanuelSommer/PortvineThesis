@@ -113,7 +113,7 @@ labeled_vinecop_plot(ground_truth_vine)
 
 ### Simulation approach
 
-We first want to simulate $n = 1100$ portfolios from this ground truth. We achieve this with the following steps:
+We first want to simulate $n = 1000$ portfolios from this ground truth. We achieve this with the following steps:
 
 - Simulate from the vine copula copula-scale residuals for each asset and each day
 - Transform the copula-scale residuals to standardized residuals by applying the inverse PIT with the learned residual distributions
@@ -154,7 +154,7 @@ simulate_one_series <- function(ground_truth_portfolio, ground_truth_vine, margi
     )
   }
   
-  # estimate the ES at 10% for the simulated portfolio and record the ES estimates
+  # estimate the ES for the simulated portfolio and record the ES estimates
   risk_roll <- estimate_risk_roll(
     data = res,
     marginal_settings = marginal_settings(
@@ -166,37 +166,63 @@ simulate_one_series <- function(ground_truth_portfolio, ground_truth_vine, margi
       refit_size = 10,
       family_set = "parametric"
     ),
-    alpha = c(0.05, 0.1),
+    alpha = c(0.05, 0.1, 0.2),
     risk_measures = "ES_mean",
-    n_samples = 1000,
+    n_samples = 10000,
     trace = FALSE
   )
-  risk_estimates <- risk_estimates(risk_roll, alpha = c(0.05, 0.1))
+  risk_estimates <- risk_estimates(risk_roll, alpha = c(0.05, 0.1, 0.2))
   # return both the realized simulated portfolio values as well as the estimated ES estimates for the validation set
   risk_estimates
+}
+
+simulate_one_realized_series <- function(ground_truth_portfolio, ground_truth_vine, marginals) {
+  copula_scale_resid <- rvinecopulib::rvinecop(750, ground_truth_vine)
+  res <- as.data.frame(copula_scale_resid)
+  # for each asset retrieve the marginal model and transform
+  for (col in colnames(ground_truth_portfolio)) {
+    # copula to standardized
+    marginal_model <- roll_filtered_model(marginals[[col]])
+    roll_distribution <- marginal_model@model$modeldesc$distribution
+    skew <- marginals[[col]]@model$coef[[1]]$coef[7, 1]
+    shape <- marginals[[col]]@model$coef[[1]]$coef[8, 1]
+    res[[col]] <- rugarch::qdist(
+      distribution = roll_distribution,
+      p = copula_scale_resid[, col],
+      skew = skew,
+      shape = shape
+    )
+    # standardized to original scale
+    res[[col]] <- ground_truth_portfolio[[col]] + (
+      marginal_model@filter$sigma * res[[col]]
+    )
+  }
+  
+  rowSums(res)[731:750]
 }
 ```
 
 
 
-```{r, warning=FALSE, include=FALSE}
+```{r, warning=FALSE, include=FALSE, eval=FALSE}
 test_simulation <- simulate_one_series(ground_truth_series, ground_truth_vine, marginals)
 test_simulation %>% filter(alpha == 0.05) %>% arrange(row_num) %>% pull(realized) %>% head()
 test_simulation %>% filter(alpha == 0.1) %>% arrange(row_num) %>% pull(risk_est) %>% length()
 ```
 
 ```{r, warning=FALSE, eval=FALSE}
-realized_returns <- matrix(nrow = 1100, ncol = 20)
+realized_returns <- matrix(nrow = 4000, ncol = 20)
 colnames(realized_returns) <- paste0("day_", 1:20)
 es_0.05_estimates <- realized_returns
 es_0.1_estimates <- realized_returns
+es_0.2_estimates <- realized_returns
 
 library(progress)
 pb <- progress_bar$new(
   format = "  simulating with portvine [:bar] :current/:total (:percent) eta: :eta",
-  total = 1100, clear = FALSE
+  total = 4000, clear = FALSE
 )
-for (simulation_number in seq(1100)) {
+for (simulation_number in seq(4000)) {
   pb$tick()
   try({
     simulation <- simulate_one_series(ground_truth_series, ground_truth_vine, marginals)
@@ -212,43 +238,72 @@ for (simulation_number in seq(1100)) {
       filter(alpha == 0.1) %>% 
       arrange(row_num) %>% 
       pull(risk_est)
+    es_0.2_estimates[simulation_number, ] <- simulation %>%
+      filter(alpha == 0.2) %>% 
+      arrange(row_num) %>% 
+      pull(risk_est)
   }, silent = TRUE)
   
   if ((simulation_number %% 50) == 0) {
     save(
-      realized_returns, es_0.05_estimates, es_0.1_estimates,
-      file = here::here("data", "poc_uncond_simulation_exp3.RData")
+      realized_returns, es_0.05_estimates, es_0.1_estimates, es_0.2_estimates,
+      file = here::here("data", "poc_uncond_simulation_exp4.RData")
     )
   }
 }
 
 save(
-  realized_returns, es_0.05_estimates, es_0.1_estimates,
-  file = here::here("data", "poc_uncond_simulation_exp3.RData")
+  realized_returns, es_0.05_estimates, es_0.1_estimates, es_0.2_estimates,
+  file = here::here("data", "poc_uncond_simulation_exp4.RData")
 )
 ```
+
+
+The estimation of the true ES will be based on 10000 simulated return series from the ground truth.
+
+
+```{r, eval=FALSE}
+realized_returns <- matrix(nrow = 10000, ncol = 20)
+pb <- progress_bar$new(
+  format = "  simulating realized returns [:bar] :current/:total (:percent) eta: :eta",
+  total = 10000, clear = FALSE
+)
+for (i in seq(10000)) {
+  pb$tick()
+  realized_returns[i, ] = simulate_one_realized_series(
+    ground_truth_series, ground_truth_vine, marginals
+  )
+}
+```
+
 
 ### Evaluation
 
 ```{r}
-load(here::here("data", "poc_uncond_simulation_exp3.RData"))
+load(here::here("data", "poc_uncond_simulation_exp4.RData"))
 ```
 
 Estimate the *true* ES first.
 
 ```{r}
 true_es <- vapply(1:20, function(day) {
-  est_es(realized_returns[, day], alpha = c(0.1, 0.05))
-}, FUN.VALUE = numeric(2))
-rownames(true_es) <- c("alpha_0.1", "alpha_0.05")
-true_es
+  est_es(realized_returns[, day], alpha = c(0.2, 0.1, 0.05))
+}, FUN.VALUE = numeric(3))
+rownames(true_es) <- c("alpha_0.2", "alpha_0.1", "alpha_0.05")
+t(true_es) %>%
+  as_tibble() %>%
+  mutate(day = (1:20)) %>%
+  pivot_longer(-day) %>%
+  ggplot(aes(x = day, y = value, col = name)) +
+  geom_line() +
+  labs(x = "Day", y = "True ES", col = "")
 ```
 
 Distribution of the ES estimates for one day only.
 
 ```{r}
 tibble(
-  true_es = true_es[2, 10],
+  true_es = true_es[3, 10],
   estimated_es = es_0.05_estimates[, 10]
 ) %>%
   ggplot() +
@@ -258,13 +313,13 @@ tibble(
 
 ```{r}
 # Have a look at the bias w.r.t. the mean of ES estimates
-bias_0.1 <- colMeans(es_0.1_estimates) - true_es[1, ]
+bias_0.1 <- colMeans(es_0.1_estimates) - true_es[2, ]
 tibble(bias = bias_0.1) %>%
   ggplot(aes(x = bias)) +
   geom_density() +
   geom_vline(xintercept = mean(bias_0.1), col = "blue") + 
   geom_vline(xintercept = 0)
-bias_0.05 <- colMeans(es_0.05_estimates) - true_es[2, ]
+bias_0.05 <- colMeans(es_0.05_estimates) - true_es[3, ]
 tibble(bias = bias_0.05) %>%
   ggplot(aes(x = bias)) +
   geom_density() +
@@ -274,10 +329,11 @@ tibble(bias = bias_0.05) %>%
 sd(realized_returns)
 ```
 
+Compared to he base variablilty the bias is a really small one.
 
 
 ```{r, message=FALSE}
-t(t(es_0.05_estimates) - true_es[2, ]) %>%
+t(t(es_0.05_estimates) - true_es[3, ]) %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
   mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
@@ -297,7 +353,7 @@ t(t(es_0.05_estimates) - true_es[2, ]) %>%
     title = "Bias of distribution of the ES estimates at significance 0.05"
   )
 
-t(t(es_0.1_estimates) - true_es[1, ]) %>%
+t(t(es_0.1_estimates) - true_es[2, ]) %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
   mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
@@ -314,10 +370,28 @@ t(t(es_0.1_estimates) - true_es[1, ]) %>%
     x = "Bias w.r.t. the true ES", y = "Forecasted Day",
     title = "Bias of distribution of the ES estimates at significance 0.1"
   )
+
+t(t(es_0.2_estimates) - true_es[1, ]) %>%
+  as_tibble() %>%
+  pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
+  mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
+  ggplot() +
+  ggridges::geom_density_ridges(
+    aes(x = bias, y = day, fill = day), col = "#383d47", na.rm = TRUE
+  ) +
+  geom_vline(xintercept = 0, linewidth = 1) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  guides(color = "none", fill = "none") +
+  xlim(-0.1, NA) +
+  labs(
+    x = "Bias w.r.t. the true ES", y = "Forecasted Day",
+    title = "Bias of distribution of the ES estimates at significance 0.2"
+  )
 ```
 
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, include=FALSE, eval=FALSE}
 realized_returns %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "realized") %>%
@@ -375,6 +449,6 @@ realized_returns %>%
 
 
 
-We can observe that the estimation bias is almost always very close to 0. Moreover we can observe that the estimation quality does not degrade during this simulated forecasting window. This is indeed an encouraging result. Furthermore we do not seem to systematically under or overestimate the ES across all the days. This is good for both the regulators which are averse against systematic overestimation and the financial institutions which are avers against systematic underestimation as it means elevated capital requirements. This is however a proof of concept simulation study with clear limitations like only a small simulation number and thus especially the true ES that we are stating for comparison is only an estimation based on a rather small sample size. So all in all this PoC study did not uncover any obvious problems in the stated estimation approach and suggests that a large scale simulation study is the next step to take.
+We can observe that the estimation bias is almost always very close to 0 compared to the base variability of the log returns ($\hat\sigma = 0.083$). Moreover we can observe that the estimation quality does slightly degrade during this simulated forecasting window. This emphasizes the need to correctly calibrate the refitting frequency to the use case at hand. Furthermore we do not seem to systematically under or overestimate the ES especially across the first 10 days. This especially holds for the more realistic alpha levels like 0.05. This is good for both the regulators which are averse against systematic overestimation and the financial institutions which are avers against systematic underestimation as it means elevated capital requirements. This is however a proof of concept simulation study with clear limitations like only a small simulation number and thus especially the true ES that we are stating for comparison is only an estimation based on a rather small sample size. So all in all this PoC study did not uncover any obvious problems in the stated estimation approach and suggests that a large scale simulation study is the next step to take.
 
 
