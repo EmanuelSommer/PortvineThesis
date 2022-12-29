@@ -121,7 +121,7 @@ We first want to simulate $n = 1000$ portfolios from this ground truth. We achie
 
 Having these series we split them into a training and validation window. We now estimate the to be assumed true ES based on the realized values of the series for each day of the validation set. Then we estimate the ES for each of the series using our method and analyze how well our approach compares to the true value. To have a better sample efficiency we have a look at the ES at level $\alpha = 0.1$ and for comparison also $\alpha = 0.05$. Moreover w.l.o.g. we assume an equal weighting for all assets.
 
-In the following we will use a training horizon of $730$ days and a validation horizon of $20$ days. 
+In the following we will use a training horizon of $730$ days and a validation horizon of $10$ days. As we need at least one refit we fit twice on a 10 day window. We will take the first to be our evaluation window.
 
 
 ```{r, include=FALSE}
@@ -286,13 +286,13 @@ load(here::here("data", "poc_uncond_simulation_exp4.RData"))
 Estimate the *true* ES first.
 
 ```{r}
-true_es <- vapply(1:20, function(day) {
+true_es <- vapply(1:10, function(day) {
   est_es(realized_returns[, day], alpha = c(0.2, 0.1, 0.05))
 }, FUN.VALUE = numeric(3))
 rownames(true_es) <- c("alpha_0.2", "alpha_0.1", "alpha_0.05")
 t(true_es) %>%
   as_tibble() %>%
-  mutate(day = (1:20)) %>%
+  mutate(day = (1:10)) %>%
   pivot_longer(-day) %>%
   ggplot(aes(x = day, y = value, col = name)) +
   geom_line() +
@@ -333,7 +333,7 @@ Compared to he base variablilty the bias is a really small one.
 
 
 ```{r, message=FALSE}
-t(t(es_0.05_estimates) - true_es[3, ]) %>%
+t(t(es_0.05_estimates[, 1:10]) - true_es[3, ]) %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
   mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
@@ -353,7 +353,7 @@ t(t(es_0.05_estimates) - true_es[3, ]) %>%
     title = "Bias of distribution of the ES estimates at significance 0.05"
   )
 
-t(t(es_0.1_estimates) - true_es[2, ]) %>%
+t(t(es_0.1_estimates[, 1:10]) - true_es[2, ]) %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
   mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
@@ -371,7 +371,7 @@ t(t(es_0.1_estimates) - true_es[2, ]) %>%
     title = "Bias of distribution of the ES estimates at significance 0.1"
   )
 
-t(t(es_0.2_estimates) - true_es[1, ]) %>%
+t(t(es_0.2_estimates[, 1:10]) - true_es[1, ]) %>%
   as_tibble() %>%
   pivot_longer(everything(), names_to = "day", values_to = "bias") %>%
   mutate(day = as.factor(as.integer(str_remove(day, "day_")))) %>%
@@ -449,6 +449,6 @@ realized_returns %>%
 
 
 
-We can observe that the estimation bias is almost always very close to 0 compared to the base variability of the log returns ($\hat\sigma = 0.083$). Moreover we can observe that the estimation quality does slightly degrade during this simulated forecasting window. This emphasizes the need to correctly calibrate the refitting frequency to the use case at hand. Furthermore we do not seem to systematically under or overestimate the ES especially across the first 10 days. This especially holds for the more realistic alpha levels like 0.05. This is good for both the regulators which are averse against systematic overestimation and the financial institutions which are avers against systematic underestimation as it means elevated capital requirements. This is however a proof of concept simulation study with clear limitations like only a small simulation number and thus especially the true ES that we are stating for comparison is only an estimation based on a rather small sample size. So all in all this PoC study did not uncover any obvious problems in the stated estimation approach and suggests that a large scale simulation study is the next step to take.
+We can observe that the estimation bias is almost always very close to 0 compared to the base variability of the log returns ($\hat\sigma = 0.083$). Furthermore we do not seem to systematically under or overestimate the ES. This especially holds for the more realistic alpha levels like 0.05. This is good for both the regulators which are averse against systematic overestimation and the financial institutions which are avers against systematic underestimation as it means elevated capital requirements. This is however a proof of concept simulation study with clear limitations like only a small simulation number and thus especially the true ES that we are stating for comparison is only an estimation based on a rather small sample size. So all in all this PoC study did not uncover any obvious problems in the stated estimation approach and suggests that a large scale simulation study is the next step to take.
 
 
