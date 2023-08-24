@@ -57,6 +57,70 @@ marginals <- fitted_marginals(uncond_risk_roll_16_19_g50_k25_p500)
 ```
 
 
+```{r}
+# Just Plot the sum of parameters for each assets over the rolling windows
+for (asset in names(marginals)) {
+  print(sapply(seq_along(marginals[[asset]]@model$coef), FUN = function(x) {
+    tmp <- as.data.frame(marginals[[asset]]@model$coef[[x]]$coef[2:3, 1:2])
+    colnames(tmp) <- c("est", "std")
+    tmp$ci_lower <- tmp$est - tmp$std
+    tmp$ci_upper <- tmp$est + tmp$std
+    tmp$window <- x
+    tmp$id <- rownames(tmp)
+    pivot_wider(tmp, names_from = "id", values_from = everything())
+  }, simplify = FALSE) %>%
+    bind_rows() %>%
+    mutate(est_diff = abs(est_ar1 + est_ma1), sd_sum = qnorm(0.975) * (std_ar1 + std_ma1)) %>%
+    ggplot() +
+    # geom_point(aes(y = est_diff, col = "est_diff", x = window_ar1)) +
+    # geom_point(aes(y = sd_sum, col = "sd_sum", x = window_ar1)) +
+    geom_line(aes(y = est_diff, x = window_ar1), col = "blue") +
+    labs(
+      title = paste0(
+        str_to_upper(str_replace(asset, "_", " ")),
+        "   - Absolute Parameter Difference"
+        ),
+      x = "Rolling Window", y = ""
+    ) +
+    scale_x_continuous(breaks = 1:6) +
+    theme(legend.position = "top")
+  )
+}
+```
+
+
+```{r}
+# approximate the KIs
+for (asset in names(marginals)) {
+  print(sapply(seq_along(marginals[[asset]]@model$coef), FUN = function(x) {
+    tmp <- as.data.frame(marginals[[asset]]@model$coef[[x]]$coef[2:3, 1:2])
+    colnames(tmp) <- c("est", "std")
+    tmp$ci_lower <- tmp$est - tmp$std
+    tmp$ci_upper <- tmp$est + tmp$std
+    tmp$window <- x
+    tmp$id <- rownames(tmp)
+    pivot_wider(tmp, names_from = "id", values_from = everything())
+  }, simplify = FALSE) %>%
+    bind_rows() %>%
+    mutate(est_diff = abs(est_ar1 + est_ma1), sd_sum = qnorm(0.975) * (std_ar1 + std_ma1)) %>%
+    ggplot() +
+    # geom_point(aes(y = est_diff, col = "est_diff", x = window_ar1)) +
+    # geom_point(aes(y = sd_sum, col = "sd_sum", x = window_ar1)) +
+    geom_line(aes(y = est_diff, col = "est_diff", x = window_ar1)) +
+    geom_line(aes(y = sd_sum, col = "sd_sum", x = window_ar1)) +
+    scale_color_manual(
+      name = "",
+      values = c("est_diff" = "#4287f5", "sd_sum" = "#f54298"),
+      labels = c("Absolute Parameter Difference", "Sum of the approximate CI distance sum")
+    ) +
+    labs(title = str_to_upper(str_replace(asset, "_", " ")), x = "Rolling Window", y = "") +
+    scale_x_continuous(breaks = 1:6) +
+    theme(legend.position = "top")
+  )
+}
+```
+
+
 
 ```{r}
 msci_spain_16_19[1:750, ] %>%
